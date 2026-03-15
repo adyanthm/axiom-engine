@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Axiom Engine (Godot Style)</title>
+</head>
+<body>
+  <div id="godot-layout">
+    <!-- Top Bar -->
+    <header id="top-bar">
+      <div class="top-menu">
+        <span class="menu-item" style="font-weight:bold; margin-right:8px;">Axiom</span>
+        <span class="menu-item">Scene</span>
+        <span class="menu-item">Project</span>
+        <span class="menu-item">Debug</span>
+        <span class="menu-item">Editor</span>
+        <span class="menu-item">Help</span>
+      </div>
+      <div class="top-workspaces">
+        <div class="workspace-tab">2D</div>
+        <div class="workspace-tab active">3D</div>
+        <div class="workspace-tab">Script</div>
+        <div class="workspace-tab">AssetLib</div>
+      </div>
+      <div class="top-controls">
+        <button class="icon-btn play-btn" title="Play">▶</button>
+        <button class="icon-btn" title="Pause">⏸</button>
+        <button class="icon-btn" title="Stop">⏹</button>
+      </div>
+    </header>
+
+    <div id="main-content">
+      <!-- Left Sidebar -->
+      <aside id="left-sidebar" class="sidebar">
+        <!-- Scene Panel -->
+        <div class="panel flex-half">
+          <div class="tabs">
+            <div class="tab active">Scene</div>
+            <div class="tab">Import</div>
+          </div>
+          <div class="toolbar panel-toolbar">
+            <button id="btn-add-node" class="icon-btn" title="Add Node" style="color:#dcdcdc">➕</button>
+            <button class="icon-btn">🔗</button>
+            <div class="spacer"></div>
+            <div class="filter-box">
+              <span class="filter-icon">🔍</span>
+              <input type="text" placeholder="Filter nodes" class="filter-input" style="width:100px" />
+            </div>
+          </div>
+          <div id="scene-tree" class="tree-view"></div>
+        </div>
+        <!-- FileSystem Panel -->
+        <div class="panel flex-half bottom-panel-sidebar">
+          <div class="tabs">
+            <div class="tab active">FileSystem</div>
+          </div>
+          <div class="toolbar panel-toolbar">
+            <div class="filter-box flex-grow">
+              <span class="filter-icon">🔍</span>
+              <input type="text" value="res://" class="filter-input" />
+            </div>
+          </div>
+          <div id="filesystem-tree" class="tree-view">
+            <div class="tree-item"><span class="icon">📁</span> res://</div>
+            <div class="tree-item indent-1"><span class="icon" style="color:#4b8eb8">📄</span> car.tscn</div>
+            <div class="tree-item indent-1"><span class="icon">📄</span> icon.png</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center Area -->
+      <main id="center-area">
+        <div id="viewport-panel" class="panel flex-grow">
+          <div class="viewport-toolbar toolbar">
+            <div class="toolbar-group tab-group">
+              <span class="tab-like active">main<span class="close-tab">×</span></span>
+            </div>
+            <div class="toolbar-group center-tools">
+              <button class="icon-btn" id="tool-select" title="Select Mode (Q)">↖</button>
+              <button class="icon-btn active" id="tool-move" title="Move (W)">✥</button>
+              <button class="icon-btn" id="tool-rotate" title="Rotate (E)">↻</button>
+              <button class="icon-btn" id="tool-scale" title="Scale (R)">⤡</button>
+              <div class="divider"></div>
+              <button class="text-btn">Transform</button>
+              <button class="text-btn">View</button>
+            </div>
+            <div class="toolbar-group right-tools" style="margin-left:auto; padding-right:8px;">
+              <button class="icon-btn" id="btn-debug-layer">⠇</button> <!-- Debug layer button -->
+            </div>
+          </div>
+          <div class="viewport-wrapper">
+            <canvas id="renderCanvas"></canvas>
+            <div class="viewport-label">Perspective</div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Right Sidebar -->
+      <aside id="right-sidebar" class="sidebar">
+        <div class="panel flex-grow">
+          <div class="tabs">
+            <div class="tab active">Inspector</div>
+            <div class="tab">Node</div>
+            <div class="tab">History</div>
+          </div>
+          <div class="toolbar panel-toolbar justify-between">
+            <div class="history-nav">
+              <button class="icon-btn">&lt;</button>
+              <button class="icon-btn">&gt;</button>
+            </div>
+            <button class="icon-btn" title="Object settings">⚙</button>
+          </div>
+          <div id="inspector-content" class="property-view">
+             <!-- properties auto generated -->
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Add Node Dialog -->
+  <div id="add-node-dialog" class="dialog-overlay hidden">
+    <div class="dialog">
+      <div class="dialog-header">Create New Node <button id="btn-close-dialog" class="close-btn">×</button></div>
+      <div class="dialog-content">
+        <input type="text" class="filter-input search-node-input" placeholder="Search..." />
+        <div class="node-list">
+          <div class="node-item selected" data-type="Mesh" data-mesh="Cube">📦 Cube</div>
+          <div class="node-item" data-type="Mesh" data-mesh="Sphere">⚽ Sphere</div>
+          <div class="node-item" data-type="Mesh" data-mesh="Cylinder">🧪 Cylinder</div>
+          <div class="node-item" data-type="Mesh" data-mesh="Plane">⬜ Plane</div>
+          <div class="node-item" data-type="Mesh" data-mesh="Torus">🍩 Torus</div>
+          <div class="node-item" data-type="Mesh" data-mesh="Capsule">💊 Capsule</div>
+          <div class="node-item" data-type="Mesh" data-mesh="Cone">🍦 Cone</div>
+          <div class="node-item" data-type="Mesh" data-mesh="Disc">⭕ Disc</div>
+          <div class="node-item" data-type="Light" data-light="Directional">☀️ Directional Light</div>
+          <div class="node-item" data-type="Light" data-light="Point">💡 Point Light</div>
+          <div class="node-item" data-type="Light" data-light="Spot">🔦 Spot Light</div>
+          <div class="node-item" data-type="Light" data-light="Hemispheric">🌐 Hemispheric Light</div>
+          <div class="node-item" data-type="Camera">🎥 Camera</div>
+          <div class="node-item" data-type="Node_Empty"><span class="icon">⬜</span> Node</div>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button id="btn-dialog-create" class="btn-primary">Create</button>
+        <button id="btn-dialog-cancel" class="btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
