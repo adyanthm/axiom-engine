@@ -40,7 +40,7 @@ export class InspectorPanel {
             return;
         }
 
-        const bNode = this.engine.babylonNodes.get(id);
+        const bNode = this.sceneManager.babylonNodes.get(id);
         const parts: string[] = [];
 
         // ─── Godot Node Header ──────────────────────────────────────────
@@ -135,6 +135,24 @@ export class InspectorPanel {
                         </label>
                     </div>
                 </div>
+                <div class="insp-row">
+                    <div class="insp-label">Visible</div>
+                    <div class="insp-field">
+                        <label class="insp-toggle">
+                            <input type="checkbox" id="prop-visible" ${entity.visible ? 'checked' : ''}>
+                            <span class="insp-toggle-track"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="insp-row">
+                    <div class="insp-label">Collidable</div>
+                    <div class="insp-field">
+                        <label class="insp-toggle">
+                            <input type="checkbox" id="prop-collidable" ${entity.collidable ? 'checked' : ''}>
+                            <span class="insp-toggle-track"></span>
+                        </label>
+                    </div>
+                </div>
             </div>`);
         }
 
@@ -181,6 +199,26 @@ export class InspectorPanel {
                     <div class="insp-label">Far</div>
                     <div class="insp-field">
                         <input class="insp-text-input" id="cam-far" type="number" step="10" value="${bNode.maxZ.toFixed(0)}">
+                    </div>
+                </div>
+            </div>
+            <div class="insp-section-header">Camera Follow</div>
+            <div class="insp-section">
+                <div class="insp-row">
+                    <div class="insp-label" title="The node to follow">Follow Target</div>
+                    <div class="insp-field">
+                        <select id="cam-follow-target" class="insp-text-input" style="appearance: auto; -webkit-appearance: auto;">
+                            <option value="">None</option>
+                            ${this.getFollowTargetOptions(entity.cameraFollowTargetId)}
+                        </select>
+                    </div>
+                </div>
+                <div class="insp-row">
+                    <div class="insp-label" title="Distance from target">Target Offset</div>
+                    <div class="insp-field">
+                        ${this.coordField('ox', 'x', entity.cameraOffset.x, '')}
+                        ${this.coordField('oy', 'y', entity.cameraOffset.y, '')}
+                        ${this.coordField('oz', 'z', entity.cameraOffset.z, '')}
                     </div>
                 </div>
             </div>`);
@@ -299,11 +337,34 @@ export class InspectorPanel {
                     <input class="insp-text-input" id="env-intensity" type="number" step="0.1" value="${entity.environmentIntensity.toFixed(2)}">
                 </div>
             </div>
-            <div class="insp-row" id="ambient-row" style="${entity.customSkyEnabled ? 'display: none;' : ''}">
-                <div class="insp-label">Ambient Color</div>
+            </div>
+        </div>
+        
+        <div class="insp-section-header">Ground Level (Physics)</div>
+        <div class="insp-section">
+            <div class="insp-row">
+                <div class="insp-label">Enable Ground</div>
                 <div class="insp-field">
-                    <input type="color" id="ambient-color" class="insp-color-swatch" value="${entity.ambientColor}">
-                    <input type="text" id="ambient-color-hex" class="insp-text-input" value="${entity.ambientColor}">
+                    <label class="insp-toggle">
+                        <input type="checkbox" id="ground-enabled" ${entity.groundLevelEnabled ? 'checked' : ''}>
+                        <span class="insp-toggle-track"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="insp-row" id="ground-pos-row" style="${entity.groundLevelEnabled ? '' : 'display: none;'}">
+                <div class="insp-label">Y Position</div>
+                <div class="insp-field">
+                    <input class="insp-text-input" id="ground-y" type="number" step="0.1" value="${entity.groundLevel.toFixed(2)}">
+                </div>
+            </div>
+            <div class="insp-row" id="ground-coll-row" style="${entity.groundLevelEnabled ? '' : 'display: none;'}">
+                <div class="insp-label">Collidable</div>
+                <div class="insp-field">
+                    <label class="insp-toggle">
+                        <input type="checkbox" id="ground-collidable" ${entity.groundLevelCollidable ? 'checked' : ''}>
+                        <span class="insp-toggle-track"></span>
+                    </label>
+                </div>
             </div>
         </div>`);
 
@@ -374,6 +435,26 @@ export class InspectorPanel {
         // Sliders for Sun (Procedural)
         setupSlider('sky-inc-slider', 'sky-inc-num', 'skyInclination');
         setupSlider('sky-az-slider', 'sky-az-num', 'skyAzimuth');
+
+        // Ground Level Events
+        const gEnabled = this.container.querySelector<HTMLInputElement>('#ground-enabled');
+        gEnabled?.addEventListener('change', () => {
+            entity.groundLevelEnabled = gEnabled.checked;
+            this.render(); // Redraw to show/hide
+            editorState.notifyTransformChanged();
+        });
+
+        const gColl = this.container.querySelector<HTMLInputElement>('#ground-collidable');
+        gColl?.addEventListener('change', () => {
+            entity.groundLevelCollidable = gColl.checked;
+            editorState.notifyTransformChanged();
+        });
+
+        const gY = this.container.querySelector<HTMLInputElement>('#ground-y');
+        gY?.addEventListener('input', () => {
+            entity.groundLevel = parseFloat(gY.value) || 0;
+            editorState.notifyTransformChanged();
+        });
     }
 
     private renderEmptyState() {
@@ -447,6 +528,15 @@ export class InspectorPanel {
                 entity.castShadows = (e.target as HTMLInputElement).checked;
                 editorState.notifyTransformChanged();
             });
+            this.container.querySelector<HTMLInputElement>('#prop-visible')?.addEventListener('change', e => {
+                entity.visible = (e.target as HTMLInputElement).checked;
+                if (bNode) bNode.setEnabled(entity.visible);
+                editorState.notifyTransformChanged();
+            });
+            this.container.querySelector<HTMLInputElement>('#prop-collidable')?.addEventListener('change', e => {
+                entity.collidable = (e.target as HTMLInputElement).checked;
+                editorState.notifyTransformChanged();
+            });
         }
 
         // Lights
@@ -472,7 +562,30 @@ export class InspectorPanel {
             bind('cam-fov', v => bNode.fov = v);
             bind('cam-near', v => bNode.minZ = v);
             bind('cam-far', v => bNode.maxZ = v);
+
+            this.container.querySelector<HTMLSelectElement>('#cam-follow-target')?.addEventListener('change', e => {
+                entity.cameraFollowTargetId = (e.target as HTMLSelectElement).value || null;
+                editorState.notifyTransformChanged();
+            });
+
+            const bindOff = (id: string, prop: 'x'|'y'|'z') => {
+                this.container.querySelector<HTMLInputElement>(`#${id}`)?.addEventListener('input', e => {
+                    entity.cameraOffset[prop] = parseFloat((e.target as HTMLInputElement).value);
+                    editorState.notifyTransformChanged();
+                });
+            };
+            bindOff('ox', 'x'); bindOff('oy', 'y'); bindOff('oz', 'z');
         }
+    }
+
+    private getFollowTargetOptions(currentId: string | null): string {
+        let options = '';
+        for (const [id, e] of this.sceneManager.entities.entries()) {
+            if (e.type === 'Mesh' || e.type === 'Node') {
+                options += `<option value="${id}" ${id === currentId ? 'selected' : ''}>${e.name}</option>`;
+            }
+        }
+        return options;
     }
 
     private coordField(id: string, tag: string, val: number, unit: string): string {

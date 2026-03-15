@@ -2,8 +2,9 @@ import './style.css';
 import { CoreEngine } from './engine/CoreEngine';
 import { HierarchyPanel } from './editor/HierarchyPanel';
 import { InspectorPanel } from './editor/InspectorPanel';
+import { ScriptPanel } from './editor/ScriptPanel';
 import { editorState } from './editor/EditorState';
-import type { GizmoMode } from './editor/EditorState';
+import type { GizmoMode, ViewMode } from './editor/EditorState';
 import { saveScene, loadScene } from './engine/ScenePersistence';
 
 // Debounced save so we don't thrash IndexedDB on every keystroke
@@ -21,6 +22,38 @@ const initEditor = async () => {
     // Wire up panels
     new HierarchyPanel('scene-tree', sm);
     new InspectorPanel('inspector-content', sm, engine);
+    new ScriptPanel('script-panel', sm);
+
+    // --- Workspace Tabs ---
+    const viewTabs = ['tab-2d', 'tab-3d', 'tab-script', 'tab-game', 'tab-assetlib'];
+    const viewMap: Record<string, ViewMode> = {
+        'tab-2d': '2d',
+        'tab-3d': '3d',
+        'tab-script': 'script',
+        'tab-game': 'game',
+        'tab-assetlib': 'assetlib'
+    };
+
+    viewTabs.forEach(id => {
+        const btn = document.getElementById(id);
+        btn?.addEventListener('click', () => {
+            editorState.setViewMode(viewMap[id]);
+        });
+    });
+
+    editorState.onViewModeChanged.push((mode) => {
+        viewTabs.forEach(id => {
+            const btn = document.getElementById(id);
+            btn?.classList.toggle('active', viewMap[id] === mode);
+        });
+
+        // Hide/Show main panels
+        const viewport = document.getElementById('viewport-panel')!;
+        const scriptPanel = document.getElementById('script-panel')!;
+
+        viewport.classList.toggle('hidden', mode !== '3d' && mode !== '2d');
+        scriptPanel.classList.toggle('hidden', mode !== 'script');
+    });
 
     // Auto-save on any tree change (add node, rename, etc.)
     editorState.onTreeChanged.push(() => scheduleSave(engine));
@@ -48,6 +81,55 @@ const initEditor = async () => {
         const cam = sm.createEntity('Camera3D', sceneRoot);
         cam.type = 'Camera';
         engine.syncEntity(cam);
+
+        // --- Default Starter Content ---
+        const cube = sm.createEntity('Cube', sceneRoot);
+        cube.type = 'Mesh';
+        cube.meshType = 'Cube';
+        cube.script = `// Cube Character Controller
+const SPEED = 5;
+const JUMP_FORCE = 0.2;
+let velocity_y = 0;
+
+function _ready() {
+    console.log("Player Cube Ready!");
+}
+
+function _process(delta) {
+    let move = new Vector3(0, 0, 0);
+    
+    if (Input.is_action_pressed("move_forward"))  move.z += 1;
+    if (Input.is_action_pressed("move_backward")) move.z -= 1;
+    if (Input.is_action_pressed("move_left"))     move.x -= 1;
+    if (Input.is_action_pressed("move_right"))    move.x += 1;
+
+    if (move.length() > 0) {
+        move.normalize();
+        move_and_slide(move.x * SPEED * delta, 0, move.z * SPEED * delta);
+    }
+
+    if (Input.is_action_pressed("jump") && is_on_floor()) {
+        velocity_y = JUMP_FORCE;
+    }
+
+    if (!is_on_floor() || velocity_y > 0) {
+        velocity_y -= 0.01;
+        move_and_slide(0, velocity_y, 0);
+    } else {
+        velocity_y = 0;
+    }
+}`;
+        engine.syncEntity(cube);
+
+        const plane = sm.createEntity('Floor', sceneRoot);
+        plane.type = 'Mesh';
+        plane.meshType = 'Plane';
+        plane.materialColor = '#2d2d2d';
+        engine.syncEntity(plane);
+        
+        // Setup initial camera follow
+        cam.cameraFollowTargetId = cube.id;
+        cam.cameraOffset = { x: 0, y: 5, z: -10 };
     }
 
     editorState.notifyTreeChanged();
@@ -111,6 +193,28 @@ const initEditor = async () => {
     };
     const closeDialog = () => dialog.classList.add('hidden');
 
+    // --- Play / Stop Controls ---
+    const playBtn = document.querySelector('.play-btn') as HTMLElement;
+    const stopBtn = document.querySelector('.top-controls .icon-btn[title="Stop"]') as HTMLElement;
+
+    playBtn?.addEventListener('click', async () => {
+        // Save current state first so game window can load it
+        await saveScene(engine);
+        
+        // Open game in new window
+        window.open('game.html', '_blank', 'width=1280,height=720');
+        
+        // For visual feedback in editor
+        playBtn.classList.add('active');
+        setTimeout(() => playBtn.classList.remove('active'), 1000);
+    });
+
+    stopBtn?.addEventListener('click', () => {
+        engine.stopGame();
+        playBtn.classList.remove('active');
+        playBtn.innerText = '▶';
+    });
+
     document.getElementById('btn-add-node')?.addEventListener('click', openDialog);
     document.getElementById('btn-close-dialog')?.addEventListener('click', closeDialog);
     document.getElementById('btn-dialog-cancel')?.addEventListener('click', closeDialog);
@@ -144,15 +248,51 @@ const initEditor = async () => {
         closeDialog();
     }
 
-    // Search filter
-    const searchInput = dialog.querySelector('.search-node-input') as HTMLInputElement | null;
-    searchInput?.addEventListener('input', () => {
-        const q = searchInput.value.toLowerCase();
-        nodeItems.forEach(item => {
-            (item as HTMLElement).style.display =
-                (item as HTMLElement).innerText.toLowerCase().includes(q) ? '' : 'none';
+    // --- Panel Resizing Logic ---
+    const setupResizer = (resizerId: string, sidebarId: string, isLeft: boolean) => {
+        const resizer = document.getElementById(resizerId);
+        const sidebar = document.getElementById(sidebarId);
+        if (!resizer || !sidebar) return;
+
+        let startX: number;
+        let startWidth: number;
+
+        const onMouseMove = (e: MouseEvent) => {
+            const dx = e.clientX - startX;
+            let newWidth = isLeft ? (startWidth + dx) : (startWidth - dx);
+            
+            // Constrain width
+            newWidth = Math.max(200, Math.min(600, newWidth));
+            sidebar.style.width = `${newWidth}px`;
+            
+            // Re-sync engine sizes (if needed, Babylon usually handles this on next frame if canvas is % based)
+            engine.babylonEngine.resize();
+        };
+
+        const onMouseUp = () => {
+            resizer.classList.remove('active');
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            document.querySelectorAll('.resizer-overlay').forEach(el => el.remove());
+        };
+
+        resizer.addEventListener('mousedown', (e) => {
+            startX = e.clientX;
+            startWidth = sidebar.getBoundingClientRect().width;
+            resizer.classList.add('active');
+            
+            // Add a glass overlay to capture mouse events even if mouse goes over iframe/canvas
+            const overlay = document.createElement('div');
+            overlay.className = 'resizer-overlay';
+            document.body.appendChild(overlay);
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
         });
-    });
+    };
+
+    setupResizer('resizer-left', 'left-sidebar', true);
+    setupResizer('resizer-right', 'right-sidebar', false);
 };
 
 window.addEventListener('DOMContentLoaded', initEditor);

@@ -1,10 +1,12 @@
 import { Entity } from './Entity';
+import { Node as BabylonNode, Scene } from '@babylonjs/core';
 
 export class SceneManager {
     public root: Entity;
     public entities = new Map<string, Entity>();
+    public babylonNodes = new Map<string, BabylonNode>();
 
-    constructor() {
+    constructor(_scene: Scene) {
         this.root = new Entity('Root');
         this.entities.set(this.root.id, this.root);
     }

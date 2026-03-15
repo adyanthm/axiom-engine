@@ -31,6 +31,18 @@ export class Entity {
     public skyCurve: number = 0.15;
     public skyEnergy: number = 1.0;
 
+    // Ground Level (Global setting in Sky)
+    public groundLevelEnabled: boolean = true;
+    public groundLevel: number = 0;
+    public groundLevelCollidable: boolean = true;
+
+    // Camera properties
+    public cameraFollowTargetId: string | null = null;
+    public cameraOffset: { x: number, y: number, z: number } = { x: 0, y: 5, z: -10 };
+
+    // Scripting
+    public script: string = '';
+
     // Material properties (for Mesh entities)
     public materialColor: string = '#b4b4b4';
     public materialEmissive: string = '#000000';
@@ -38,6 +50,10 @@ export class Entity {
     public emissiveIntensity: number = 1.0;
     public materialMetallic: number = 0;
     public materialRoughness: number = 0.7;
+
+    // Visibility and Collision
+    public visible: boolean = true;
+    public collidable: boolean = true;
 
     // Shadow options
     public castShadows: boolean = true;

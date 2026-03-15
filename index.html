@@ -19,10 +19,11 @@
         <span class="menu-item">Help</span>
       </div>
       <div class="top-workspaces">
-        <div class="workspace-tab">2D</div>
-        <div class="workspace-tab active">3D</div>
-        <div class="workspace-tab">Script</div>
-        <div class="workspace-tab">AssetLib</div>
+        <div id="tab-2d" class="workspace-tab">2D</div>
+        <div id="tab-3d" class="workspace-tab active">3D</div>
+        <div id="tab-script" class="workspace-tab">Script</div>
+        <div id="tab-game" class="workspace-tab">Game</div>
+        <div id="tab-assetlib" class="workspace-tab">AssetLib</div>
       </div>
       <div class="top-controls">
         <button class="icon-btn play-btn" title="Play">▶</button>
@@ -69,6 +70,8 @@
           </div>
         </div>
       </aside>
+      <div class="resizer" id="resizer-left"></div>
+
 
       <!-- Center Area -->
       <main id="center-area">
@@ -95,7 +98,13 @@
             <div class="viewport-label">Perspective</div>
           </div>
         </div>
+
+        <div id="script-panel" class="panel flex-grow hidden">
+           <!-- CodeMirror 6 will live here -->
+        </div>
       </main>
+      <div class="resizer" id="resizer-right"></div>
+
 
       <!-- Right Sidebar -->
       <aside id="right-sidebar" class="sidebar">

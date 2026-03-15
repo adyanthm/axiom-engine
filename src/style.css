@@ -181,6 +181,29 @@ button {
   border-left: 1px solid var(--g-border);
 }
 
+.resizer {
+  width: 4px;
+  cursor: col-resize;
+  background-color: transparent;
+  transition: background-color 0.2s;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.resizer:hover, .resizer.active {
+  background-color: var(--g-accent);
+}
+
+.resizer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  cursor: col-resize;
+}
+
 /* =====================
    PANEL (generic)
    ===================== */
@@ -447,6 +470,17 @@ button {
   overflow-y: auto;
   min-height: 0;
   background-color: #242933;
+}
+
+#center-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hidden {
+  display: none !important;
 }
 
 /* Header for the selected node type */
@@ -816,3 +850,159 @@ button {
 .filter-toolbar {
   border-top: 1px solid var(--g-border);
 }
+
+/* =====================
+   SCRIPT EDITOR LAYOUT
+   ===================== */
+#script-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.script-editor-layout {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+  background: var(--g-dark);
+}
+
+.script-sidebar {
+  width: 240px;
+  background: var(--g-panel);
+  border-right: 1px solid var(--g-border);
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-bottom: 1px solid var(--g-border);
+}
+
+.sidebar-toolbar {
+  padding: 4px 8px;
+  background: var(--g-panel);
+  border-bottom: 1px solid var(--g-border);
+}
+
+.sidebar-filter {
+  width: 100%;
+  background: var(--g-dark);
+  border: 1px solid var(--g-border);
+  border-radius: 3px;
+  color: var(--g-text);
+  font-size: 11px;
+  padding: 4px 8px;
+  outline: none;
+}
+.sidebar-filter:focus { border-color: var(--g-accent); }
+
+.section-header {
+  padding: 6px 12px;
+  background: var(--g-dark);
+  color: var(--g-text-dim);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--g-border);
+}
+
+.list-container {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.list-item {
+  padding: 6px 12px;
+  color: var(--g-text);
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+.list-item:hover { background: var(--g-hover); }
+.list-item.active { background: var(--g-hover); color: var(--g-text-light); border-left: 2px solid var(--g-accent); }
+
+.script-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.script-tabs {
+  height: 32px;
+  background: var(--g-panel);
+  display: flex;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--g-dark);
+}
+
+.tab-scroll {
+  display: flex;
+  padding-left: 8px;
+}
+
+.editor-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  background: #1e1e1e; /* CodeMirror theme background is usually separate */
+}
+
+.cm-editor {
+  height: 100%;
+  font-size: 14px;
+}
+
+.empty-editor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #666;
+  font-style: italic;
+  font-size: 16px;
+}
+
+/* =====================
+   CONTEXT MENU
+   ===================== */
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: #2d2d2d;
+  border: 1px solid #444;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  border-radius: 4px;
+  padding: 4px 0;
+  min-width: 160px;
+}
+
+.menu-item-action {
+  padding: 8px 16px;
+  color: #ddd;
+  font-size: 13px;
+  cursor: pointer;
+}
+.menu-item-action:hover {
+  background: #4b8eb8;
+  color: white;
+}
+.menu-item-action.divider {
+  height: 1px;
+  background: #444;
+  margin: 4px 0;
+  padding: 0;
+}
+.menu-item-action.disabled {
+  color: #666;
+  pointer-events: none;
+}
+

@@ -9,6 +9,7 @@ import { SkyMaterial, GridMaterial, GradientMaterial } from '@babylonjs/material
 import '@babylonjs/inspector';
 import { SceneManager } from './SceneManager';
 import { Entity } from './Entity';
+import { GameRuntime } from './GameRuntime';
 import { editorState } from '../editor/EditorState';
 import type { GizmoMode } from '../editor/EditorState';
 
@@ -16,17 +17,19 @@ export class CoreEngine {
     public babylonEngine: Engine;
     public babylonScene: Scene;
     public sceneManager: SceneManager;
-    public babylonNodes = new Map<string, BabylonNode>();
     public shadowGenerator: ShadowGenerator | null = null;
     public skyMaterial: SkyMaterial | null = null;
 
+    private runtime: GameRuntime;
+    private isPlaying: boolean = false;
     private gizmoManager!: GizmoManager;
     private debugLayerVisible = false;
 
     constructor(canvas: HTMLCanvasElement) {
         this.babylonEngine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
         this.babylonScene = new Scene(this.babylonEngine);
-        this.sceneManager = new SceneManager();
+        this.sceneManager = new SceneManager(this.babylonScene);
+        this.runtime = new GameRuntime(this.babylonScene, this.sceneManager);
 
         this.babylonScene.clearColor = new Color4(0.15, 0.18, 0.22, 1.0);
 
@@ -37,7 +40,13 @@ export class CoreEngine {
         editorState.onGizmoModeChanged.push((mode) => this.applyGizmoMode(mode));
         editorState.onSelectionChanged.push((id) => this._handleSelectionVisuals(id));
 
-        this.babylonEngine.runRenderLoop(() => this.babylonScene.render());
+        this.babylonEngine.runRenderLoop(() => {
+            if (this.isPlaying) {
+                const delta = this.babylonEngine.getDeltaTime() / 1000;
+                this.runtime.update(delta);
+            }
+            this.babylonScene.render();
+        });
         window.addEventListener('resize', () => this.babylonEngine.resize());
     }
 
@@ -133,7 +142,7 @@ export class CoreEngine {
 
         const id = editorState.selectedEntityId;
         if (!id) return;
-        const node = this.babylonNodes.get(id);
+        const node = this.sceneManager.babylonNodes.get(id);
         if (!(node instanceof Mesh)) return;
 
         this.gizmoManager.attachToMesh(node);
@@ -155,7 +164,7 @@ export class CoreEngine {
         this.gizmoManager.boundingBoxGizmoEnabled = false;
 
         if (!selectedId) return;
-        const node = this.babylonNodes.get(selectedId);
+        const node = this.sceneManager.babylonNodes.get(selectedId);
         if (node instanceof Mesh && !node.name.startsWith('__')) {
             node.renderOutline = true;
             node.outlineColor = Color3.FromHexString('#ff8800');
@@ -168,7 +177,7 @@ export class CoreEngine {
         this.babylonScene.onPointerDown = (evt, pickResult) => {
             if (evt.button !== 0) return;
             if (pickResult.hit && pickResult.pickedMesh && !pickResult.pickedMesh.name.startsWith('__')) {
-                const entry = [...this.babylonNodes.entries()].find(([, n]) => n === pickResult.pickedMesh);
+                const entry = [...this.sceneManager.babylonNodes.entries()].find(([, n]) => n === pickResult.pickedMesh);
                 if (entry) { editorState.selectEntity(entry[0]); return; }
             }
             editorState.clearSelection();
@@ -185,7 +194,7 @@ export class CoreEngine {
     }
 
     public applyMaterialToEntity(entity: Entity) {
-        const node = this.babylonNodes.get(entity.id);
+        const node = this.sceneManager.babylonNodes.get(entity.id);
         if (!(node instanceof Mesh)) return;
 
         let mat = node.material as StandardMaterial | null;
@@ -276,7 +285,7 @@ export class CoreEngine {
     }
 
     public syncEntity(entity: Entity) {
-        if (this.babylonNodes.has(entity.id)) {
+        if (this.sceneManager.babylonNodes.has(entity.id)) {
             // If it already exists, just update environment if it's sky
             if (entity.type === 'Sky') this.updateEnvironment(entity);
             return;
@@ -353,6 +362,17 @@ export class CoreEngine {
         }
 
         node.name = entity.name;
-        this.babylonNodes.set(entity.id, node);
+        node.setEnabled(entity.visible);
+        this.sceneManager.babylonNodes.set(entity.id, node);
+    }
+
+    public startGame() {
+        this.isPlaying = true;
+        this.runtime.start();
+    }
+
+    public stopGame() {
+        this.isPlaying = false;
+        this.runtime.stop();
     }
 }

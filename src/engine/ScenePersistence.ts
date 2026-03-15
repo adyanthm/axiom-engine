@@ -21,6 +21,38 @@ interface SerializedEntity {
     lightType?: LightType;
     parentId: string | null;
     transform?: SerializedTransform;
+    
+    // Properties
+    skyTurbidity?: number;
+    skyRayleigh?: number;
+    skyMieCoefficient?: number;
+    skyMieDirectionalG?: number;
+    skyLuminance?: number;
+    skyInclination?: number;
+    skyAzimuth?: number;
+    environmentIntensity?: number;
+    ambientColor?: string;
+    customSkyEnabled?: boolean;
+    skyTopColor?: string;
+    skyHorizonColor?: string;
+    skyCurve?: number;
+    skyEnergy?: number;
+    cameraFollowTargetId?: string | null;
+    cameraOffset?: { x: number, y: number, z: number };
+    script?: string;
+    materialColor?: string;
+    materialEmissive?: string;
+    emissiveEnabled?: boolean;
+    emissiveIntensity?: number;
+    materialMetallic?: number;
+    materialRoughness?: number;
+    castShadows?: boolean;
+    receiveShadows?: boolean;
+    visible?: boolean;
+    collidable?: boolean;
+    groundLevelEnabled?: boolean;
+    groundLevel?: number;
+    groundLevelCollidable?: boolean;
 }
 
 interface SerializedScene {
@@ -47,7 +79,7 @@ export async function saveScene(engine: CoreEngine): Promise<void> {
     const queue: Entity[] = [...sm.root.children];
     while (queue.length > 0) {
         const entity = queue.shift()!;
-        const bNode = engine.babylonNodes.get(entity.id);
+        const bNode = engine.sceneManager.babylonNodes.get(entity.id);
         let transform: SerializedTransform | undefined;
 
         if (bNode instanceof TransformNode) {
@@ -69,6 +101,37 @@ export async function saveScene(engine: CoreEngine): Promise<void> {
             lightType: entity.lightType,
             parentId: entity.parent?.id ?? null,
             transform,
+            
+            skyTurbidity: entity.skyTurbidity,
+            skyRayleigh: entity.skyRayleigh,
+            skyMieCoefficient: entity.skyMieCoefficient,
+            skyMieDirectionalG: entity.skyMieDirectionalG,
+            skyLuminance: entity.skyLuminance,
+            skyInclination: entity.skyInclination,
+            skyAzimuth: entity.skyAzimuth,
+            environmentIntensity: entity.environmentIntensity,
+            ambientColor: entity.ambientColor,
+            customSkyEnabled: entity.customSkyEnabled,
+            skyTopColor: entity.skyTopColor,
+            skyHorizonColor: entity.skyHorizonColor,
+            skyCurve: entity.skyCurve,
+            skyEnergy: entity.skyEnergy,
+            cameraFollowTargetId: entity.cameraFollowTargetId,
+            cameraOffset: entity.cameraOffset,
+            script: entity.script,
+            materialColor: entity.materialColor,
+            materialEmissive: entity.materialEmissive,
+            emissiveEnabled: entity.emissiveEnabled,
+            emissiveIntensity: entity.emissiveIntensity,
+            materialMetallic: entity.materialMetallic,
+            materialRoughness: entity.materialRoughness,
+            castShadows: entity.castShadows,
+            receiveShadows: entity.receiveShadows,
+            visible: entity.visible,
+            collidable: entity.collidable,
+            groundLevelEnabled: entity.groundLevelEnabled,
+            groundLevel: entity.groundLevel,
+            groundLevelCollidable: entity.groundLevelCollidable,
         });
 
         for (const child of entity.children) queue.push(child);
@@ -115,6 +178,38 @@ export async function loadScene(engine: CoreEngine): Promise<boolean> {
             entity.type = se.type;
             entity.meshType = se.meshType;
             entity.lightType = se.lightType;
+
+            if (se.skyTurbidity !== undefined) entity.skyTurbidity = se.skyTurbidity;
+            if (se.skyRayleigh !== undefined) entity.skyRayleigh = se.skyRayleigh;
+            if (se.skyMieCoefficient !== undefined) entity.skyMieCoefficient = se.skyMieCoefficient;
+            if (se.skyMieDirectionalG !== undefined) entity.skyMieDirectionalG = se.skyMieDirectionalG;
+            if (se.skyLuminance !== undefined) entity.skyLuminance = se.skyLuminance;
+            if (se.skyInclination !== undefined) entity.skyInclination = se.skyInclination;
+            if (se.skyAzimuth !== undefined) entity.skyAzimuth = se.skyAzimuth;
+            if (se.environmentIntensity !== undefined) entity.environmentIntensity = se.environmentIntensity;
+            if (se.ambientColor !== undefined) entity.ambientColor = se.ambientColor;
+            if (se.customSkyEnabled !== undefined) entity.customSkyEnabled = se.customSkyEnabled;
+            if (se.skyTopColor !== undefined) entity.skyTopColor = se.skyTopColor;
+            if (se.skyHorizonColor !== undefined) entity.skyHorizonColor = se.skyHorizonColor;
+            if (se.skyCurve !== undefined) entity.skyCurve = se.skyCurve;
+            if (se.skyEnergy !== undefined) entity.skyEnergy = se.skyEnergy;
+            if (se.cameraFollowTargetId !== undefined) entity.cameraFollowTargetId = se.cameraFollowTargetId;
+            if (se.cameraOffset !== undefined) entity.cameraOffset = se.cameraOffset;
+            if (se.script !== undefined) entity.script = se.script;
+            if (se.materialColor !== undefined) entity.materialColor = se.materialColor;
+            if (se.materialEmissive !== undefined) entity.materialEmissive = se.materialEmissive;
+            if (se.emissiveEnabled !== undefined) entity.emissiveEnabled = se.emissiveEnabled;
+            if (se.emissiveIntensity !== undefined) entity.emissiveIntensity = se.emissiveIntensity;
+            if (se.materialMetallic !== undefined) entity.materialMetallic = se.materialMetallic;
+            if (se.materialRoughness !== undefined) entity.materialRoughness = se.materialRoughness;
+            if (se.castShadows !== undefined) entity.castShadows = se.castShadows;
+            if (se.receiveShadows !== undefined) entity.receiveShadows = se.receiveShadows;
+            if (se.visible !== undefined) entity.visible = se.visible;
+            if (se.collidable !== undefined) entity.collidable = se.collidable;
+            if (se.groundLevelEnabled !== undefined) entity.groundLevelEnabled = se.groundLevelEnabled;
+            if (se.groundLevel !== undefined) entity.groundLevel = se.groundLevel;
+            if (se.groundLevelCollidable !== undefined) entity.groundLevelCollidable = se.groundLevelCollidable;
+
             entityMap.set(se.id, entity);
         }
 
@@ -135,7 +230,7 @@ export async function loadScene(engine: CoreEngine): Promise<boolean> {
             engine.syncEntity(entity);
 
             if (se.transform) {
-                const bNode = engine.babylonNodes.get(se.id);
+                const bNode = engine.sceneManager.babylonNodes.get(se.id);
                 if (bNode instanceof TransformNode) {
                     const t = se.transform;
                     bNode.position.set(t.px, t.py, t.pz);

@@ -74,11 +74,67 @@ export class HierarchyPanel {
             editorState.selectEntity(entity.id);
         });
 
+        row.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editorState.selectEntity(entity.id);
+            this.showContextMenu(e.clientX, e.clientY, entity);
+        });
+
         this.container.appendChild(row);
 
         for (const child of entity.children) {
             this.renderNode(child, depth + 1);
         }
+    }
+
+    private showContextMenu(x: number, y: number, entity: Entity) {
+        // Remove existing
+        document.querySelector('.context-menu')?.remove();
+
+        const menu = document.createElement('div');
+        menu.className = 'context-menu';
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+
+        const hasScript = entity.script && entity.script.trim() !== '';
+        const items = [
+            { 
+                label: hasScript ? 'Edit Script' : 'Attach Script', 
+                action: () => {
+                    if (!hasScript) {
+                        entity.script = `// ${entity.name}.js\n\nfunction _ready() {\n    // Called when node enters scene\n}\n\nfunction _process(delta) {\n    // Called every frame\n}\n`;
+                    }
+                    editorState.setViewMode('script');
+                }
+            },
+            { label: 'Delete', action: () => {
+                this.sceneManager.removeEntity(entity.id);
+                editorState.clearSelection();
+                editorState.notifyTreeChanged();
+            }}
+        ];
+
+        items.forEach((item: any) => {
+            const el = document.createElement('div');
+            el.className = `menu-item-action ${item.disabled ? 'disabled' : ''}`;
+            el.innerText = item.label;
+            el.onclick = () => {
+                if (!item.disabled) {
+                    item.action();
+                    menu.remove();
+                }
+            };
+            menu.appendChild(el);
+        });
+
+        document.body.appendChild(menu);
+
+        const closeMenu = () => {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+        };
+        setTimeout(() => document.addEventListener('click', closeMenu), 10);
     }
 
     private updateHighlight() {
