@@ -51,9 +51,9 @@ export class GameRuntime {
                             // 1. Check Global Ground
                             const sky = Array.from(this.sceneManager.entities.values()).find(e => e.type === 'Sky');
                             if (sky && sky.groundLevelEnabled && sky.groundLevelCollidable) {
-                                const minHeight = sky.groundLevel + 0.5;
-                                if (newPos.y < minHeight) {
-                                    newPos.y = minHeight;
+                                const surfaceY = sky.groundLevel + 0.5;
+                                if (pos.y >= surfaceY - 0.01 && newPos.y < surfaceY) {
+                                    newPos.y = surfaceY;
                                     collided = true;
                                 }
                             }
@@ -71,8 +71,17 @@ export class GameRuntime {
                                         const dx = Math.abs(newPos.x - op.x);
                                         const dz = Math.abs(newPos.z - op.z);
                                         if (dx < 2.5 && dz < 2.5) { // Ground is 5x5
-                                            if (newPos.y < op.y + 0.5) {
-                                                newPos.y = op.y + 0.5;
+                                            const surfaceY = op.y + 0.5;
+                                            const bottomY = op.y - 0.5;
+
+                                            // 1. Landing from above (Floor)
+                                            if (pos.y >= surfaceY - 0.1 && newPos.y < surfaceY) {
+                                                newPos.y = surfaceY;
+                                                collided = true;
+                                            }
+                                            // 2. Hitting from below (Ceiling / Bonk)
+                                            else if (pos.y <= bottomY + 0.1 && newPos.y > bottomY) {
+                                                newPos.y = bottomY;
                                                 collided = true;
                                             }
                                         }
@@ -96,7 +105,7 @@ export class GameRuntime {
                             // Ground check
                             const sky = Array.from(this.sceneManager.entities.values()).find(e => e.type === 'Sky');
                             if (sky && sky.groundLevelEnabled && sky.groundLevelCollidable) {
-                                if (pos.y <= sky.groundLevel + 0.55) return true;
+                                if (Math.abs(pos.y - (sky.groundLevel + 0.5)) < 0.1) return true;
                             }
                             
                             // Mesh check
@@ -108,7 +117,7 @@ export class GameRuntime {
                                     if (e.meshType === 'Plane') {
                                         const dx = Math.abs(pos.x - op.x);
                                         const dz = Math.abs(pos.z - op.z);
-                                        if (dx < 2.5 && dz < 2.5 && pos.y <= op.y + 0.55) return true;
+                                        if (dx < 2.5 && dz < 2.5 && Math.abs(pos.y - (op.y + 0.5)) < 0.1) return true;
                                     } else if (Vector3.Distance(pos, op) < 1.05) return true;
                                 }
                             }

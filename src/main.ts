@@ -114,7 +114,8 @@ function _process(delta) {
 
     if (!is_on_floor() || velocity_y > 0) {
         velocity_y -= 0.01;
-        move_and_slide(0, velocity_y, 0);
+        const collided = move_and_slide(0, velocity_y, 0);
+        if (collided && velocity_y > 0) velocity_y = 0; // Bonk head
     } else {
         velocity_y = 0;
     }
