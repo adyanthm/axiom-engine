@@ -67,6 +67,11 @@ export class HierarchyPanel {
 
         const label = document.createElement('span');
         label.innerText = entity.name;
+        if (entity.type === 'Camera' && entity.isMainCamera) {
+            label.innerText += ' (Main)';
+            label.style.color = '#7ec8f0';
+            label.style.fontWeight = 'bold';
+        }
         row.appendChild(label);
 
         row.addEventListener('click', (e) => {

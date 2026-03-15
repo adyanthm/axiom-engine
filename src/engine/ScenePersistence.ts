@@ -53,6 +53,7 @@ interface SerializedEntity {
     groundLevelEnabled?: boolean;
     groundLevel?: number;
     groundLevelCollidable?: boolean;
+    isMainCamera?: boolean;
 }
 
 interface SerializedScene {
@@ -132,6 +133,7 @@ export async function saveScene(engine: CoreEngine): Promise<void> {
             groundLevelEnabled: entity.groundLevelEnabled,
             groundLevel: entity.groundLevel,
             groundLevelCollidable: entity.groundLevelCollidable,
+            isMainCamera: entity.isMainCamera,
         });
 
         for (const child of entity.children) queue.push(child);
@@ -209,6 +211,7 @@ export async function loadScene(engine: CoreEngine): Promise<boolean> {
             if (se.groundLevelEnabled !== undefined) entity.groundLevelEnabled = se.groundLevelEnabled;
             if (se.groundLevel !== undefined) entity.groundLevel = se.groundLevel;
             if (se.groundLevelCollidable !== undefined) entity.groundLevelCollidable = se.groundLevelCollidable;
+            if (se.isMainCamera !== undefined) entity.isMainCamera = se.isMainCamera;
 
             entityMap.set(se.id, entity);
         }

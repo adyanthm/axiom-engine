@@ -37,6 +37,7 @@ export class Entity {
     public groundLevelCollidable: boolean = true;
 
     // Camera properties
+    public isMainCamera: boolean = false;
     public cameraFollowTargetId: string | null = null;
     public cameraOffset: { x: number, y: number, z: number } = { x: 0, y: 5, z: -10 };
 

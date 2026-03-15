@@ -146,6 +146,7 @@ export class CoreEngine {
         if (!(node instanceof Mesh)) return;
 
         this.gizmoManager.attachToMesh(node);
+        if (this.isPlaying) return;
         if (mode === 'move')   this.gizmoManager.positionGizmoEnabled = true;
         if (mode === 'rotate') this.gizmoManager.rotationGizmoEnabled = true;
         if (mode === 'scale')  this.gizmoManager.scaleGizmoEnabled = true;
@@ -175,6 +176,7 @@ export class CoreEngine {
 
     private setupPicking() {
         this.babylonScene.onPointerDown = (evt, pickResult) => {
+            if (this.isPlaying) return;
             if (evt.button !== 0) return;
             if (pickResult.hit && pickResult.pickedMesh && !pickResult.pickedMesh.name.startsWith('__')) {
                 const entry = [...this.sceneManager.babylonNodes.entries()].find(([, n]) => n === pickResult.pickedMesh);
@@ -368,11 +370,37 @@ export class CoreEngine {
 
     public startGame() {
         this.isPlaying = true;
+        
+        // Clear editor selection visuals
+        editorState.clearSelection();
+        
+        // Find main camera
+        const mainCamEntity = Array.from(this.sceneManager.entities.values()).find(e => e.type === 'Camera' && e.isMainCamera);
+        if (mainCamEntity) {
+            const bCam = this.sceneManager.babylonNodes.get(mainCamEntity.id) as ArcRotateCamera;
+            if (bCam) {
+                // Detach editor camera
+                const editorCam = this.babylonScene.getCameraByName('editorCamera');
+                editorCam?.detachControl();
+                
+                // Set main camera as active
+                this.babylonScene.activeCamera = bCam;
+                bCam.attachControl(this.babylonEngine.getRenderingCanvas(), true);
+            }
+        }
+
         this.runtime.start();
     }
 
     public stopGame() {
         this.isPlaying = false;
         this.runtime.stop();
+
+        // Restore editor camera
+        const editorCam = this.babylonScene.getCameraByName('editorCamera');
+        if (editorCam) {
+            this.babylonScene.activeCamera = editorCam;
+            editorCam.attachControl(this.babylonEngine.getRenderingCanvas(), true);
+        }
     }
 }

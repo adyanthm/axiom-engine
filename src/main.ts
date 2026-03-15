@@ -80,6 +80,7 @@ const initEditor = async () => {
 
         const cam = sm.createEntity('Camera3D', sceneRoot);
         cam.type = 'Camera';
+        cam.isMainCamera = true;
         engine.syncEntity(cam);
 
         // --- Default Starter Content ---

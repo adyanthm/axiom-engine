@@ -201,6 +201,15 @@ export class InspectorPanel {
                         <input class="insp-text-input" id="cam-far" type="number" step="10" value="${bNode.maxZ.toFixed(0)}">
                     </div>
                 </div>
+                <div class="insp-row">
+                    <div class="insp-label">Main Camera</div>
+                    <div class="insp-field">
+                        <label class="insp-toggle">
+                            <input type="checkbox" id="cam-is-main" ${entity.isMainCamera ? 'checked' : ''}>
+                            <span class="insp-toggle-track"></span>
+                        </label>
+                    </div>
+                </div>
             </div>
             <div class="insp-section-header">Camera Follow</div>
             <div class="insp-section">
@@ -575,6 +584,24 @@ export class InspectorPanel {
                 });
             };
             bindOff('ox', 'x'); bindOff('oy', 'y'); bindOff('oz', 'z');
+
+            this.container.querySelector<HTMLInputElement>('#cam-is-main')?.addEventListener('change', e => {
+                const checked = (e.target as HTMLInputElement).checked;
+                
+                if (checked) {
+                    // Turn off any other main camera
+                    for (const other of this.sceneManager.entities.values()) {
+                        if (other.type === 'Camera') {
+                            other.isMainCamera = (other.id === entity.id);
+                        }
+                    }
+                } else {
+                    entity.isMainCamera = false;
+                }
+                
+                editorState.notifyTreeChanged(); // Icon in tree might change
+                editorState.notifyTransformChanged(); // For saving
+            });
         }
     }
 
