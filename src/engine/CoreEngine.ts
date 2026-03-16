@@ -4,11 +4,13 @@ import {
     MeshBuilder, TransformNode, Mesh, Color3, Color4,
     StandardMaterial, GizmoManager,
     ShadowGenerator, Node as BabylonNode,
-    SceneLoader
+    SceneLoader, HavokPlugin, PhysicsAggregate, PhysicsShapeType, PhysicsMotionType,
+    PhysicsViewer
 } from '@babylonjs/core';
 import '@babylonjs/loaders';
 import { SkyMaterial, GridMaterial, GradientMaterial } from '@babylonjs/materials';
 import '@babylonjs/inspector';
+import HavokPhysics from '@babylonjs/havok';
 import { SceneManager } from './SceneManager';
 import { Entity } from './Entity';
 import { GameRuntime } from './GameRuntime';
@@ -27,6 +29,8 @@ export class CoreEngine {
     private isPlaying: boolean = false;
     private gizmoManager!: GizmoManager;
     private debugLayerVisible = false;
+    private physicsViewer: PhysicsViewer | null = null;
+    private static _havokInstance: any = null;
 
     constructor(canvas: HTMLCanvasElement) {
         this.babylonEngine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
@@ -52,6 +56,17 @@ export class CoreEngine {
             this.babylonScene.render();
         });
         window.addEventListener('resize', () => this.babylonEngine.resize());
+    }
+
+    public static async Create(canvas: HTMLCanvasElement): Promise<CoreEngine> {
+        if (!CoreEngine._havokInstance) {
+            CoreEngine._havokInstance = await HavokPhysics();
+        }
+        const engine = new CoreEngine(canvas);
+        const hk = new HavokPlugin(true, CoreEngine._havokInstance);
+        engine.babylonScene.enablePhysics(new Vector3(0, -9.81, 0), hk);
+        engine.physicsViewer = new PhysicsViewer(engine.babylonScene);
+        return engine;
     }
 
     private setupEditorEnvironment(canvas: HTMLCanvasElement) {
@@ -207,8 +222,20 @@ export class CoreEngine {
     public toggleDebugLayer() {
         if (this.debugLayerVisible) {
             this.babylonScene.debugLayer.hide();
+            // Hide physics debug
+            for (const mesh of this.babylonScene.meshes) {
+                if (mesh.parent instanceof BabylonNode && (mesh.parent as any).physicsBody) {
+                    this.physicsViewer?.hideBody((mesh.parent as any).physicsBody);
+                }
+            }
         } else {
             this.babylonScene.debugLayer.show({ embedMode: true });
+            // Show physics debug
+            for (const mesh of this.babylonScene.meshes) {
+                if ((mesh as any).physicsBody) {
+                    this.physicsViewer?.showBody((mesh as any).physicsBody);
+                }
+            }
         }
         this.debugLayerVisible = !this.debugLayerVisible;
     }
@@ -286,6 +313,28 @@ export class CoreEngine {
                 hemi.groundColor = new Color3(0.1, 0.1, 0.1);
                 hemi.intensity = 1.0;
             }
+        }
+
+        // Handle Global Ground Physics
+        const groundBodyName = '__global_physics_ground__';
+        let groundNode = this.babylonScene.getMeshByName(groundBodyName);
+        
+        if (entity.groundLevelEnabled && entity.groundLevelCollidable) {
+            if (!groundNode) {
+                // Extremely large static box for collision
+                groundNode = MeshBuilder.CreateBox(groundBodyName, { width: 2000, height: 1, depth: 2000 }, this.babylonScene);
+                groundNode.isVisible = false;
+                groundNode.isPickable = false;
+            }
+            groundNode.position.y = entity.groundLevel - 0.5; // Surface at groundLevel
+            
+            if (!(groundNode as any).physicsBody && this.babylonScene.isPhysicsEnabled()) {
+                const aggregate = new PhysicsAggregate(groundNode, PhysicsShapeType.BOX, { mass: 0, friction: 0.5, restitution: 0.1 }, this.babylonScene);
+                (groundNode as any).physicsBody = aggregate.body;
+            }
+        } else if (groundNode) {
+            if ((groundNode as any).physicsBody) (groundNode as any).physicsBody.dispose();
+            groundNode.dispose();
         }
     }
 
@@ -365,6 +414,10 @@ export class CoreEngine {
         node!.name = entity.name;
         node!.setEnabled(entity.visible);
         this.sceneManager.babylonNodes.set(entity.id, node!);
+        
+        if (this.isPlaying) {
+            this.applyPhysicsToEntity(entity);
+        }
 
         this.updateColliderVisuals(entity, node!);
     }
@@ -376,13 +429,13 @@ export class CoreEngine {
         }
     }
 
-    private updateColliderVisuals(entity: Entity, node: BabylonNode) {
+    public updateColliderVisuals(entity: Entity, node: BabylonNode) {
         if (!(node instanceof Mesh) && !(node instanceof TransformNode)) return;
 
         const meshes = (node instanceof Mesh) ? [node] : node.getChildMeshes();
         
         meshes.forEach(m => {
-            if (entity.hasCollider && !this.isPlaying) {
+            if (entity.physicsType !== 'None' && !this.isPlaying) {
                 m.renderOverlay = true;
                 m.overlayColor = new Color3(0.4, 0.7, 1.0); // Light Blue
                 m.overlayAlpha = 0.25; // Semi-transparent
@@ -417,6 +470,12 @@ export class CoreEngine {
     public startGame() {
         this.isPlaying = true;
         editorState.clearSelection();
+        
+        // Apply physics to all entities
+        for (const entity of this.sceneManager.entities.values()) {
+            this.applyPhysicsToEntity(entity);
+        }
+
         const mainCamEntity = Array.from(this.sceneManager.entities.values()).find(e => e.type === 'Camera' && e.isMainCamera);
         if (mainCamEntity) {
             const bCam = this.sceneManager.babylonNodes.get(mainCamEntity.id) as ArcRotateCamera;
@@ -433,10 +492,84 @@ export class CoreEngine {
     public stopGame() {
         this.isPlaying = false;
         this.runtime.stop();
+
+        // Remove physics from all entities
+        for (const id of this.sceneManager.entities.keys()) {
+            const node = this.sceneManager.babylonNodes.get(id);
+            if (node && (node as any).physicsBody) {
+                (node as any).physicsBody.dispose();
+                (node as any).physicsBody = null;
+            }
+        }
+
         const editorCam = this.babylonScene.getCameraByName('editorCamera');
         if (editorCam) {
             this.babylonScene.activeCamera = editorCam;
             editorCam.attachControl(this.babylonEngine.getRenderingCanvas(), true);
+        }
+    }
+
+    public applyPhysicsToEntity(entity: Entity) {
+        if (!this.isPlaying) return;
+        if (entity.physicsType === 'None' && !entity.hasCollider) return;
+        const node = this.sceneManager.babylonNodes.get(entity.id);
+        if (!(node instanceof Mesh) && !(node instanceof TransformNode)) return;
+
+        // Clean up existing physics
+        if ((node as any).physicsBody) {
+            (node as any).physicsBody.dispose();
+            (node as any).physicsBody = null;
+        }
+
+        // Determine shape and override for Planes (Ground)
+        let shapeType = PhysicsShapeType.BOX;
+        let extents: Vector3 | undefined;
+
+        if (entity.type === 'Mesh') {
+            if (entity.meshType === 'Sphere') shapeType = PhysicsShapeType.SPHERE;
+            else if (entity.meshType === 'Cylinder' || entity.meshType === 'Capsule') shapeType = PhysicsShapeType.CAPSULE;
+            else if (entity.meshType === 'Plane') {
+                shapeType = PhysicsShapeType.BOX;
+                // Force a thickness for planes so objects don't tunnel through
+                extents = new Vector3(5, 0.1, 5); 
+            }
+            else if (entity.meshType === 'ImportedModel') shapeType = PhysicsShapeType.MESH;
+        }
+
+        let motionType = PhysicsMotionType.STATIC;
+        if (entity.physicsType === 'Dynamic') motionType = PhysicsMotionType.DYNAMIC;
+        else if (entity.physicsType === 'Kinematic') motionType = PhysicsMotionType.ANIMATED;
+
+        try {
+            const props: any = {
+                mass: entity.physicsType === 'Static' || entity.physicsType === 'None' ? 0 : entity.mass,
+                friction: entity.friction,
+                restitution: entity.restitution
+            };
+            if (extents) props.extents = extents;
+
+            const aggregate = new PhysicsAggregate(node, shapeType, props, this.babylonScene);
+
+            aggregate.body.setMotionType(motionType);
+            aggregate.body.setLinearDamping(entity.linearDamping);
+            aggregate.body.setAngularDamping(entity.angularDamping);
+            
+            // Lock Rotation
+            if (entity.lockRotationX || entity.lockRotationY || entity.lockRotationZ) {
+                const massProps = aggregate.body.getMassProperties();
+                if (entity.lockRotationX) massProps.inertia!.x = 0;
+                if (entity.lockRotationY) massProps.inertia!.y = 0;
+                if (entity.lockRotationZ) massProps.inertia!.z = 0;
+                aggregate.body.setMassProperties(massProps);
+            }
+
+            // Collision Filters
+            aggregate.shape.filterMembershipMask = entity.collisionLayer;
+            aggregate.shape.filterCollideMask = entity.collisionMask;
+            
+            (node as any).physicsBody = aggregate.body;
+        } catch (e) {
+            console.error(`Failed to apply physics to ${entity.name}:`, e);
         }
     }
 }

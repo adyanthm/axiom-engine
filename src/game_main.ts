@@ -5,7 +5,7 @@ async function initGame() {
     const canvas = document.getElementById('canvas') as HTMLCanvasElement;
     if (!canvas) return;
 
-    const engine = new CoreEngine(canvas);
+    const engine = await CoreEngine.Create(canvas);
     
     // Hide editor specific things
     // In a real project we'd have a 'GameOnlyEngine' but let's reuse CoreEngine for now

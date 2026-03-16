@@ -38,104 +38,61 @@ export class GameRuntime {
                             return e ? this.sceneManager.babylonNodes.get(e.id) : null;
                         },
                         translate: (x: number, y: number, z: number) => {
-                            if ('position' in node) {
+                            const body = (node as any).physicsBody;
+                            if (body && (node as any).position) {
+                                const pos = (node as any).position.add(new Vector3(x, y, z));
+                                body.transformData.position.copyFrom(pos);
+                            } else if ('position' in node) {
                                 (node as any).position.addInPlace(new Vector3(x, y, z));
                             }
                         },
                         move_and_slide: (vx: number, vy: number, vz: number) => {
-                            if (!('position' in node)) return;
-                            const pos = (node as any).position;
-                            let newPos = pos.add(new Vector3(vx, vy, vz));
-                            let collided = false;
+                            const body = (node as any).physicsBody;
+                            const d = (context as any).delta || 0.016;
+                            if (body) {
+                                body.setLinearVelocity(new Vector3(vx, vy, vz));
+                                // Simple grounded check: is vertical velocity nearly zero?
+                                const totalVel = body.getLinearVelocity();
+                                return Math.abs(totalVel.y) < 0.1;
+                            }
                             
-                            // 1. Check Global Ground
-                            const sky = Array.from(this.sceneManager.entities.values()).find(e => e.type === 'Sky');
-                            if (sky && sky.groundLevelEnabled && sky.groundLevelCollidable) {
-                                const surfaceY = sky.groundLevel + 0.5;
-                                if (pos.y >= surfaceY - 0.01 && newPos.y < surfaceY) {
-                                    newPos.y = surfaceY;
-                                    collided = true;
-                                }
-                            }
-
-                            // 2. Check Other Entities (Mesh Collision)
-                            for (const otherE of this.sceneManager.entities.values()) {
-                                if (otherE.id === entity.id || !otherE.collidable || otherE.type !== 'Mesh') continue;
-                                const otherNode = this.sceneManager.babylonNodes.get(otherE.id);
-                                if (otherNode && 'position' in otherNode) {
-                                    const op = (otherNode as any).position;
-                                    
-                                    // Extremely simplified AABB (assuming meshes are 1x1x1 scaled)
-                                    // Especially for 'Plane' (Floor), we check if we are on top
-                                    if (otherE.meshType === 'Plane') {
-                                        const dx = Math.abs(newPos.x - op.x);
-                                        const dz = Math.abs(newPos.z - op.z);
-                                        if (dx < 2.5 && dz < 2.5) { // Ground is 5x5
-                                            const surfaceY = op.y + 0.5;
-                                            const bottomY = op.y - 0.5;
-
-                                            // 1. Landing from above (Floor)
-                                            if (pos.y >= surfaceY - 0.1 && newPos.y < surfaceY) {
-                                                newPos.y = surfaceY;
-                                                collided = true;
-                                            }
-                                            // 2. Hitting from below (Ceiling / Bonk)
-                                            else if (pos.y <= bottomY + 0.1 && newPos.y > bottomY) {
-                                                newPos.y = bottomY;
-                                                collided = true;
-                                            }
-                                        }
-                                    } else {
-                                        // Standard primitives or Imported Models
-                                        let isColliding = false;
-                                        if (otherE.meshType === 'ImportedModel') {
-                                            // Mesh Collider logic for complex models
-                                            const meshes = (otherNode as any).getChildMeshes ? (otherNode as any).getChildMeshes() : [otherNode];
-                                            for (const m of meshes) {
-                                                if (m.intersectsPoint(newPos)) {
-                                                    isColliding = true;
-                                                    break;
-                                                }
-                                            }
-                                        } else {
-                                            // Simple sphere check for primitives
-                                            const dist = Vector3.Distance(newPos, op);
-                                            if (dist < 1.0) isColliding = true;
-                                        }
-
-                                        if (isColliding) {
-                                            newPos = pos.clone(); // Blocked entirely
-                                            collided = true;
-                                        }
-                                    }
-                                }
-                            }
-
-                            pos.copyFrom(newPos);
-                            return collided;
-                        },
-                        is_on_floor: () => {
                             if (!('position' in node)) return false;
                             const pos = (node as any).position;
-                            
-                            // Ground check
-                            const sky = Array.from(this.sceneManager.entities.values()).find(e => e.type === 'Sky');
-                            if (sky && sky.groundLevelEnabled && sky.groundLevelCollidable) {
-                                if (Math.abs(pos.y - (sky.groundLevel + 0.5)) < 0.1) return true;
-                            }
-                            
-                            // Mesh check
-                            for (const e of this.sceneManager.entities.values()) {
-                                if (e.id === entity.id || !e.collidable || e.type !== 'Mesh') continue;
-                                const n = this.sceneManager.babylonNodes.get(e.id);
-                                if (n && 'position' in n) {
-                                    const op = (n as any).position;
-                                    if (e.meshType === 'Plane') {
-                                        const dx = Math.abs(pos.x - op.x);
-                                        const dz = Math.abs(pos.z - op.z);
-                                        if (dx < 2.5 && dz < 2.5 && Math.abs(pos.y - (op.y + 0.5)) < 0.1) return true;
-                                    } else if (Vector3.Distance(pos, op) < 1.05) return true;
+                            pos.addInPlace(new Vector3(vx * d, vy * d, vz * d));
+                            return false;
+                        },
+                        rotate_y: (angle: number) => {
+                            if ('rotation' in node) {
+                                (node as any).rotation.y += angle;
+                                const body = (node as any).physicsBody;
+                                if (body) {
+                                    // Sync physics rotation if it's dynamic
+                                    body.transformData.rotation.y = (node as any).rotation.y;
                                 }
+                            }
+                        },
+                        set_linear_velocity: (vx: number, vy: number, vz: number) => {
+                            const body = (node as any).physicsBody;
+                            if (body) body.setLinearVelocity(new Vector3(vx, vy, vz));
+                        },
+                        get_linear_velocity: () => {
+                            const body = (node as any).physicsBody;
+                            if (body) {
+                                const vel = body.getLinearVelocity();
+                                return { x: vel.x, y: vel.y, z: vel.z };
+                            }
+                            return { x: 0, y: 0, z: 0 };
+                        },
+                        apply_impulse: (vx: number, vy: number, vz: number) => {
+                            const body = (node as any).physicsBody;
+                            if (body && (node as any).position) body.applyImpulse(new Vector3(vx, vy, vz), (node as any).position);
+                        },
+                        is_on_floor: () => {
+                            const body = (node as any).physicsBody;
+                            if (body) {
+                                // Simple raycast or velocity check for floor
+                                const vel = body.getLinearVelocity();
+                                return Math.abs(vel.y) < 0.01;
                             }
                             return false;
                         }

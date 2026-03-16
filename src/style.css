@@ -1069,3 +1069,57 @@ button {
     display: inline-block;
     max-width: 140px;
 }
+
+/* Animation for play button */
+@keyframes pulse-green {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.play-btn.active {
+  animation: pulse-green 2s infinite ease-in-out;
+  color: #a0f0a0 !important;
+}
+
+/* Physics bitfield */
+.bitfield {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.bit-toggle {
+  flex: none;
+  display: flex;
+}
+
+.bit-toggle input {
+  display: none;
+}
+
+.bit-toggle label {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  background: #14171d;
+  color: #4b5263;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid #2d3343;
+  transition: all 0.1s;
+}
+
+.bit-toggle input:checked + label {
+  background: #4b8eb8;
+  color: white;
+  border-color: #5bb1d9;
+}
+
+.bit-toggle label:hover {
+  border-color: #5bb1d9;
+}

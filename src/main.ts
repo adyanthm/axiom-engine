@@ -18,7 +18,7 @@ function scheduleSave(engine: CoreEngine) {
 
 const initEditor = async () => {
     const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
-    const engine = new CoreEngine(canvas);
+    const engine = await CoreEngine.Create(canvas);
     const sm = engine.sceneManager;
 
     // Wire up panels
@@ -147,13 +147,14 @@ const initEditor = async () => {
         const cube = sm.createEntity('Cube', sceneRoot);
         cube.type = 'Mesh';
         cube.meshType = 'Cube';
-        cube.script = `// Cube Character Controller
-const SPEED = 5;
-const JUMP_FORCE = 0.2;
-let velocity_y = 0;
+        cube.physicsType = 'Dynamic';
+        cube.mass = 1.0;
+        cube.script = `// Physics-based Cube Controller
+const SPEED = 10;
+const JUMP_IMPULSE = 5;
 
 function _ready() {
-    console.log("Player Cube Ready!");
+    console.log("Physics Player Ready!");
 }
 
 function _process(delta) {
@@ -166,19 +167,12 @@ function _process(delta) {
 
     if (move.length() > 0) {
         move.normalize();
-        move_and_slide(move.x * SPEED * delta, 0, move.z * SPEED * delta);
+        let curVel = get_linear_velocity();
+        set_linear_velocity(move.x * SPEED, curVel.y, move.z * SPEED);
     }
 
     if (Input.is_action_pressed("jump") && is_on_floor()) {
-        velocity_y = JUMP_FORCE;
-    }
-
-    if (!is_on_floor() || velocity_y > 0) {
-        velocity_y -= 0.01;
-        const collided = move_and_slide(0, velocity_y, 0);
-        if (collided && velocity_y > 0) velocity_y = 0; // Bonk head
-    } else {
-        velocity_y = 0;
+        apply_impulse(0, JUMP_IMPULSE, 0);
     }
 }`;
         engine.syncEntity(cube);
@@ -186,6 +180,7 @@ function _process(delta) {
         const plane = sm.createEntity('Floor', sceneRoot);
         plane.type = 'Mesh';
         plane.meshType = 'Plane';
+        plane.physicsType = 'Static';
         plane.materialColor = '#2d2d2d';
         engine.syncEntity(plane);
         
@@ -215,14 +210,57 @@ function _process(delta) {
         });
     });
 
+    const colBtn = document.getElementById('tool-collision');
+    colBtn?.addEventListener('click', () => {
+        const id = editorState.selectedEntityId;
+        if (!id) return;
+        const entity = sm.entities.get(id);
+        if (entity && entity.type === 'Mesh') {
+            entity.hasCollider = !entity.hasCollider;
+            const node = sm.babylonNodes.get(id);
+            if (node) {
+                engine.updateColliderVisuals(entity, node);
+                engine.applyPhysicsToEntity(entity);
+            }
+            updateCollisionBtnState();
+            scheduleSave(engine);
+        }
+    });
+
+    function updateCollisionBtnState() {
+        if (!colBtn) return;
+        const id = editorState.selectedEntityId;
+        const entity = id ? sm.entities.get(id) : null;
+        const isMesh = entity && (entity.type === 'Mesh');
+        
+        colBtn.style.opacity = isMesh ? '1' : '0.4';
+        colBtn.style.pointerEvents = isMesh ? 'auto' : 'none';
+        
+        if (isMesh && entity.hasCollider) {
+            colBtn.classList.add('active');
+        } else {
+            colBtn.classList.remove('active');
+        }
+    }
+
     // Keyboard shortcuts: Q/W/E/R (Godot / Blender style)
     window.addEventListener('keydown', (e) => {
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-        const map: Record<string, string> = { q: 'tool-select', w: 'tool-move', e: 'tool-rotate', r: 'tool-scale' };
+        const map: Record<string, string> = { 
+            q: 'tool-select', 
+            w: 'tool-move', 
+            e: 'tool-rotate', 
+            r: 'tool-scale',
+            c: 'tool-collision'
+        };
         const btnId = map[e.key.toLowerCase()];
         if (btnId) {
-            editorState.setGizmoMode(toolMap[btnId]);
-            setActiveTool(btnId);
+            if (btnId === 'tool-collision') {
+                colBtn?.click();
+            } else {
+                editorState.setGizmoMode(toolMap[btnId]);
+                setActiveTool(btnId);
+            }
         }
     });
 
@@ -230,6 +268,11 @@ function _process(delta) {
         document.querySelectorAll('.center-tools .icon-btn').forEach(b => b.classList.remove('active'));
         document.getElementById(id)?.classList.add('active');
     }
+
+    // Selection change
+    editorState.onSelectionChanged.push(() => {
+        updateCollisionBtnState();
+    });
 
     // Debug layer toggle
     document.getElementById('btn-debug-layer')?.addEventListener('click', () => engine.toggleDebugLayer());

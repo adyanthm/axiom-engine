@@ -1,6 +1,7 @@
 export type EntityType = 'Node' | 'Mesh' | 'Light' | 'Camera' | 'Sky' | 'Particles';
 export type MeshType = 'Cube' | 'Sphere' | 'Cylinder' | 'Plane' | 'Torus' | 'Capsule' | 'Cone' | 'Disc' | 'ImportedModel';
 export type LightType = 'Directional' | 'Point' | 'Spot' | 'Hemispheric';
+export type PhysicsType = 'None' | 'Static' | 'Dynamic' | 'Kinematic';
 
 export class Entity {
     public id: string;
@@ -13,6 +14,19 @@ export class Entity {
     public meshType?: MeshType;
     public modelAssetId: string | null = null;
     public lightType?: LightType;
+
+    // Physics properties
+    public physicsType: PhysicsType = 'None';
+    public mass: number = 1.0;
+    public friction: number = 0.5;
+    public restitution: number = 0.1;
+    public linearDamping: number = 0.0;
+    public angularDamping: number = 0.0;
+    public collisionLayer: number = 1;
+    public collisionMask: number = 1;
+    public lockRotationX: boolean = false;
+    public lockRotationY: boolean = false;
+    public lockRotationZ: boolean = false;
 
     // Sky / Environment properties
     public skyTurbidity: number = 2.0;

@@ -157,6 +157,65 @@ export class InspectorPanel {
                     </div>
                 </div>
             </div>`);
+
+            // ─── Physics ──────────────────────────────────────────────────
+            parts.push(`
+            <div class="insp-section-header">Physics</div>
+            <div class="insp-section">
+                <div class="insp-row">
+                    <div class="insp-label">Body Type</div>
+                    <div class="insp-field">
+                        <select id="physics-type" class="insp-text-input" style="appearance: auto; -webkit-appearance: auto;">
+                            <option value="None" ${entity.physicsType === 'None' ? 'selected' : ''}>None</option>
+                            <option value="Static" ${entity.physicsType === 'Static' ? 'selected' : ''}>Static</option>
+                            <option value="Dynamic" ${entity.physicsType === 'Dynamic' ? 'selected' : ''}>Dynamic</option>
+                            <option value="Kinematic" ${entity.physicsType === 'Kinematic' ? 'selected' : ''}>Kinematic</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="physics-props" style="${entity.physicsType === 'None' ? 'display: none;' : ''}">
+                    <div class="insp-row">
+                        <div class="insp-label">Mass</div>
+                        <div class="insp-field">
+                            <input class="insp-text-input" id="physics-mass" type="number" step="0.1" value="${(entity.mass ?? 1.0).toFixed(2)}">
+                        </div>
+                    </div>
+                    <div class="insp-row">
+                        <div class="insp-label">Friction</div>
+                        <div class="insp-field">
+                            <input class="insp-text-input" id="physics-friction" type="number" step="0.1" value="${(entity.friction ?? 0.5).toFixed(2)}">
+                        </div>
+                    </div>
+                    <div class="insp-row">
+                        <div class="insp-label">Restitution</div>
+                        <div class="insp-field">
+                            <input class="insp-text-input" id="physics-restitution" type="number" step="0.1" value="${(entity.restitution ?? 0.1).toFixed(2)}">
+                        </div>
+                    </div>
+                    <div class="insp-row">
+                        <div class="insp-label">Linear Damping</div>
+                        <div class="insp-field">
+                            <input class="insp-text-input" id="physics-lin-damp" type="number" step="0.01" value="${(entity.linearDamping ?? 0.0).toFixed(2)}">
+                        </div>
+                    </div>
+                    <div class="insp-row">
+                        <div class="insp-label">Angular Damping</div>
+                        <div class="insp-field">
+                            <input class="insp-text-input" id="physics-ang-damp" type="number" step="0.01" value="${(entity.angularDamping ?? 0.0).toFixed(2)}">
+                        </div>
+                    </div>
+                    ${this.renderCollisionBitfield('Layer', entity.collisionLayer ?? 1, 'collision-layer')}
+                    ${this.renderCollisionBitfield('Mask', entity.collisionMask ?? 1, 'collision-mask')}
+                    <div class="insp-row">
+                        <div class="insp-label">Lock Rotation</div>
+                        <div class="insp-field" style="gap: 10px;">
+                            <label class="insp-toggle"><input type="checkbox" id="phys-lock-x" ${entity.lockRotationX ? 'checked' : ''}><div class="insp-toggle-track"></div> X</label>
+                            <label class="insp-toggle"><input type="checkbox" id="phys-lock-y" ${entity.lockRotationY ? 'checked' : ''}><div class="insp-toggle-track"></div> Y</label>
+                            <label class="insp-toggle"><input type="checkbox" id="phys-lock-z" ${entity.lockRotationZ ? 'checked' : ''}><div class="insp-toggle-track"></div> Z</label>
+                        </div>
+                    </div>
+                </div>
+            </div>`);
         }
 
         // ─── Light ───────────────────────────────────────────────────────
@@ -622,6 +681,63 @@ export class InspectorPanel {
                 editorState.notifyTransformChanged(); // For saving
             });
         }
+
+        // Physics
+        const pType = this.container.querySelector<HTMLSelectElement>('#physics-type');
+        pType?.addEventListener('change', () => {
+            entity.physicsType = pType.value as any;
+            const node = this.sceneManager.babylonNodes.get(entity.id);
+            if (node) {
+                this.engine.applyPhysicsToEntity(entity);
+                this.engine.updateColliderVisuals(entity, node);
+            }
+            this.render(); // Re-render to show/hide properties
+            editorState.notifyTransformChanged();
+        });
+
+        const bindPhys = (id: string, prop: keyof Entity) => {
+            const el = this.container.querySelector<HTMLInputElement>(`#${id}`);
+            el?.addEventListener('input', () => {
+                (entity as any)[prop] = parseFloat(el.value) || 0;
+                this.engine.applyPhysicsToEntity(entity);
+            });
+            el?.addEventListener('change', () => {
+                editorState.notifyTransformChanged();
+            });
+        };
+        bindPhys('physics-mass', 'mass');
+        bindPhys('physics-friction', 'friction');
+        bindPhys('physics-restitution', 'restitution');
+        bindPhys('physics-lin-damp', 'linearDamping');
+        bindPhys('physics-ang-damp', 'angularDamping');
+
+        const bindBitfield = (prefix: string, prop: 'collisionLayer' | 'collisionMask') => {
+            for (let i = 0; i < 8; i++) {
+                const el = this.container.querySelector<HTMLInputElement>(`#${prefix}-bit-${i}`);
+                el?.addEventListener('change', () => {
+                    if (el.checked) {
+                        (entity as any)[prop] |= (1 << i);
+                    } else {
+                        (entity as any)[prop] &= ~(1 << i);
+                    }
+                    this.engine.applyPhysicsToEntity(entity);
+                    editorState.notifyTransformChanged();
+                });
+            }
+        };
+        bindBitfield('collision-layer', 'collisionLayer');
+        bindBitfield('collision-mask', 'collisionMask');
+
+        const bindCheck = (id: string, prop: keyof Entity) => {
+            this.container.querySelector<HTMLInputElement>(`#${id}`)?.addEventListener('change', (e) => {
+                (entity as any)[prop] = (e.target as HTMLInputElement).checked;
+                this.engine.applyPhysicsToEntity(entity);
+                editorState.notifyTransformChanged();
+            });
+        };
+        bindCheck('phys-lock-x', 'lockRotationX');
+        bindCheck('phys-lock-y', 'lockRotationY');
+        bindCheck('phys-lock-z', 'lockRotationZ');
     }
 
     private getFollowTargetOptions(currentId: string | null): string {
@@ -640,6 +756,25 @@ export class InspectorPanel {
             <span class="coord-tag ${tag}">${tag}</span>
             <input type="number" id="${id}" step="0.1" value="${val.toFixed(3)}">
             <span class="coord-unit">${unit}</span>
+        </div>`;
+    }
+
+    private renderCollisionBitfield(label: string, value: number, prefix: string): string {
+        let bits = '';
+        for (let i = 0; i < 8; i++) {
+            const checked = (value & (1 << i)) !== 0;
+            bits += `
+            <div class="bit-toggle" title="Layer ${i + 1}">
+                <input type="checkbox" id="${prefix}-bit-${i}" ${checked ? 'checked' : ''}>
+                <label for="${prefix}-bit-${i}">${i + 1}</label>
+            </div>`;
+        }
+        return `
+        <div class="insp-row">
+            <div class="insp-label">${label}</div>
+            <div class="insp-field bitfield">
+                ${bits}
+            </div>
         </div>`;
     }
 

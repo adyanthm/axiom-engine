@@ -1,4 +1,4 @@
-import type { Entity, EntityType, MeshType, LightType } from './Entity';
+import type { Entity, EntityType, MeshType, LightType, PhysicsType } from './Entity';
 import type { CoreEngine } from './CoreEngine';
 import { TransformNode } from '@babylonjs/core';
 
@@ -71,6 +71,19 @@ interface SerializedEntity {
     isMainCamera?: boolean;
     modelAssetId?: string | null;
     hasCollider?: boolean;
+
+    // Physics
+    physicsType?: PhysicsType;
+    mass?: number;
+    friction?: number;
+    restitution?: number;
+    linearDamping?: number;
+    angularDamping?: number;
+    collisionLayer?: number;
+    collisionMask?: number;
+    lockRotationX?: boolean;
+    lockRotationY?: boolean;
+    lockRotationZ?: boolean;
 }
 
 interface SerializedScene {
@@ -142,6 +155,18 @@ export async function saveScene(engine: CoreEngine): Promise<void> {
             isMainCamera: entity.isMainCamera,
             modelAssetId: entity.modelAssetId,
             hasCollider: entity.hasCollider,
+
+            physicsType: entity.physicsType,
+            mass: entity.mass,
+            friction: entity.friction,
+            restitution: entity.restitution,
+            linearDamping: entity.linearDamping,
+            angularDamping: entity.angularDamping,
+            collisionLayer: entity.collisionLayer,
+            collisionMask: entity.collisionMask,
+            lockRotationX: entity.lockRotationX,
+            lockRotationY: entity.lockRotationY,
+            lockRotationZ: entity.lockRotationZ,
         });
 
         for (const child of entity.children) queue.push(child);
@@ -189,39 +214,51 @@ export async function loadScene(engine: CoreEngine): Promise<boolean> {
 
             // Copy all properties in one go using object spread
             Object.assign(entity, {
-                skyTurbidity: se.skyTurbidity,
-                skyRayleigh: se.skyRayleigh,
-                skyMieCoefficient: se.skyMieCoefficient,
-                skyMieDirectionalG: se.skyMieDirectionalG,
-                skyLuminance: se.skyLuminance,
-                skyInclination: se.skyInclination,
-                skyAzimuth: se.skyAzimuth,
-                environmentIntensity: se.environmentIntensity,
-                ambientColor: se.ambientColor,
-                customSkyEnabled: se.customSkyEnabled,
-                skyTopColor: se.skyTopColor,
-                skyHorizonColor: se.skyHorizonColor,
-                skyCurve: se.skyCurve,
-                skyEnergy: se.skyEnergy,
-                cameraFollowTargetId: se.cameraFollowTargetId,
-                cameraOffset: se.cameraOffset,
-                script: se.script,
-                materialColor: se.materialColor,
-                materialEmissive: se.materialEmissive,
-                emissiveEnabled: se.emissiveEnabled,
-                emissiveIntensity: se.emissiveIntensity,
-                materialMetallic: se.materialMetallic,
-                materialRoughness: se.materialRoughness,
-                castShadows: se.castShadows,
-                receiveShadows: se.receiveShadows,
-                visible: se.visible,
-                collidable: se.collidable,
-                groundLevelEnabled: se.groundLevelEnabled,
-                groundLevel: se.groundLevel,
-                groundLevelCollidable: se.groundLevelCollidable,
-                isMainCamera: se.isMainCamera,
-                modelAssetId: se.modelAssetId,
-                hasCollider: se.hasCollider,
+                skyTurbidity: se.skyTurbidity ?? entity.skyTurbidity,
+                skyRayleigh: se.skyRayleigh ?? entity.skyRayleigh,
+                skyMieCoefficient: se.skyMieCoefficient ?? entity.skyMieCoefficient,
+                skyMieDirectionalG: se.skyMieDirectionalG ?? entity.skyMieDirectionalG,
+                skyLuminance: se.skyLuminance ?? entity.skyLuminance,
+                skyInclination: se.skyInclination ?? entity.skyInclination,
+                skyAzimuth: se.skyAzimuth ?? entity.skyAzimuth,
+                environmentIntensity: se.environmentIntensity ?? entity.environmentIntensity,
+                ambientColor: se.ambientColor ?? entity.ambientColor,
+                customSkyEnabled: se.customSkyEnabled ?? entity.customSkyEnabled,
+                skyTopColor: se.skyTopColor ?? entity.skyTopColor,
+                skyHorizonColor: se.skyHorizonColor ?? entity.skyHorizonColor,
+                skyCurve: se.skyCurve ?? entity.skyCurve,
+                skyEnergy: se.skyEnergy ?? entity.skyEnergy,
+                cameraFollowTargetId: se.cameraFollowTargetId ?? entity.cameraFollowTargetId,
+                cameraOffset: se.cameraOffset ?? entity.cameraOffset,
+                script: se.script ?? entity.script,
+                materialColor: se.materialColor ?? entity.materialColor,
+                materialEmissive: se.materialEmissive ?? entity.materialEmissive,
+                emissiveEnabled: se.emissiveEnabled ?? entity.emissiveEnabled,
+                emissiveIntensity: se.emissiveIntensity ?? entity.emissiveIntensity,
+                materialMetallic: se.materialMetallic ?? entity.materialMetallic,
+                materialRoughness: se.materialRoughness ?? entity.materialRoughness,
+                castShadows: se.castShadows ?? entity.castShadows,
+                receiveShadows: se.receiveShadows ?? entity.receiveShadows,
+                visible: se.visible ?? entity.visible,
+                collidable: se.collidable ?? entity.collidable,
+                groundLevelEnabled: se.groundLevelEnabled ?? entity.groundLevelEnabled,
+                groundLevel: se.groundLevel ?? entity.groundLevel,
+                groundLevelCollidable: se.groundLevelCollidable ?? entity.groundLevelCollidable,
+                isMainCamera: se.isMainCamera ?? entity.isMainCamera,
+                modelAssetId: se.modelAssetId ?? entity.modelAssetId,
+                hasCollider: se.hasCollider ?? entity.hasCollider,
+
+                physicsType: se.physicsType ?? entity.physicsType,
+                mass: se.mass ?? entity.mass,
+                friction: se.friction ?? entity.friction,
+                restitution: se.restitution ?? entity.restitution,
+                linearDamping: se.linearDamping ?? entity.linearDamping,
+                angularDamping: se.angularDamping ?? entity.angularDamping,
+                collisionLayer: se.collisionLayer ?? entity.collisionLayer,
+                collisionMask: se.collisionMask ?? entity.collisionMask,
+                lockRotationX: se.lockRotationX ?? entity.lockRotationX,
+                lockRotationY: se.lockRotationY ?? entity.lockRotationY,
+                lockRotationZ: se.lockRotationZ ?? entity.lockRotationZ,
             });
 
             entityMap.set(se.id, entity);
