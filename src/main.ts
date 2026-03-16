@@ -3,6 +3,8 @@ import { CoreEngine } from './engine/CoreEngine';
 import { HierarchyPanel } from './editor/HierarchyPanel';
 import { InspectorPanel } from './editor/InspectorPanel';
 import { ScriptPanel } from './editor/ScriptPanel';
+import { FileSystemPanel } from './editor/FileSystemPanel';
+import { assetDB } from './editor/AssetDatabase';
 import { editorState } from './editor/EditorState';
 import type { GizmoMode, ViewMode } from './editor/EditorState';
 import { saveScene, loadScene } from './engine/ScenePersistence';
@@ -23,6 +25,15 @@ const initEditor = async () => {
     new HierarchyPanel('scene-tree', sm);
     new InspectorPanel('inspector-content', sm, engine);
     new ScriptPanel('script-panel', sm);
+    
+    const fsPanel = new FileSystemPanel(document.getElementById('filesystem-tree')!);
+    
+    // Wire up FileSystem uploads
+    const uploadBtn = document.getElementById('btn-upload-asset');
+    const uploadInput = document.getElementById('asset-upload-input') as HTMLInputElement;
+    
+    uploadBtn?.addEventListener('click', () => uploadInput?.click());
+    uploadInput?.addEventListener('change', (e) => fsPanel.handleUpload(e));
 
     // --- Workspace Tabs ---
     const viewTabs = ['tab-2d', 'tab-3d', 'tab-script', 'tab-game', 'tab-assetlib'];
@@ -57,6 +68,55 @@ const initEditor = async () => {
 
     // Auto-save on any tree change (add node, rename, etc.)
     editorState.onTreeChanged.push(() => scheduleSave(engine));
+
+    // --- Viewport Drag & Drop ---
+    const viewportPanel = document.getElementById('viewport-panel')!;
+    viewportPanel.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        viewportPanel.style.outline = '2px solid var(--g-accent)';
+    });
+
+    viewportPanel.addEventListener('dragleave', () => {
+        viewportPanel.style.outline = 'none';
+    });
+
+    viewportPanel.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        viewportPanel.style.outline = 'none';
+
+        const files = e.dataTransfer?.files;
+        if (!files || files.length === 0) return;
+
+        for (const file of Array.from(files)) {
+            const name = file.name.toLowerCase();
+            if (name.endsWith('.glb') || name.endsWith('.gltf') || name.endsWith('.obj')) {
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    const data = event.target?.result as string;
+                    const asset = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        name: file.name,
+                        type: 'model/gltf-binary',
+                        size: file.size,
+                        data: data
+                    };
+                    await assetDB.saveAsset(asset);
+                    fsPanel.init();
+
+                    const modelEntity = sm.createEntity(file.name, sm.root.children[0] || sm.root);
+                    modelEntity.type = 'Mesh';
+                    modelEntity.meshType = 'ImportedModel';
+                    modelEntity.modelAssetId = asset.id;
+                    engine.syncEntity(modelEntity);
+                    editorState.selectEntity(modelEntity.id);
+                    editorState.notifyTreeChanged();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+    });
     // Auto-save when inspector updates transforms (inspector fires this)
     editorState.onTransformChanged.push(() => scheduleSave(engine));
 

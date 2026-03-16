@@ -86,8 +86,24 @@ export class GameRuntime {
                                             }
                                         }
                                     } else {
-                                        const dist = Vector3.Distance(newPos, op);
-                                        if (dist < 1.0) {
+                                        // Standard primitives or Imported Models
+                                        let isColliding = false;
+                                        if (otherE.meshType === 'ImportedModel') {
+                                            // Mesh Collider logic for complex models
+                                            const meshes = (otherNode as any).getChildMeshes ? (otherNode as any).getChildMeshes() : [otherNode];
+                                            for (const m of meshes) {
+                                                if (m.intersectsPoint(newPos)) {
+                                                    isColliding = true;
+                                                    break;
+                                                }
+                                            }
+                                        } else {
+                                            // Simple sphere check for primitives
+                                            const dist = Vector3.Distance(newPos, op);
+                                            if (dist < 1.0) isColliding = true;
+                                        }
+
+                                        if (isColliding) {
                                             newPos = pos.clone(); // Blocked entirely
                                             collided = true;
                                         }

@@ -117,10 +117,42 @@ export class HierarchyPanel {
                 this.sceneManager.removeEntity(entity.id);
                 editorState.clearSelection();
                 editorState.notifyTreeChanged();
-            }}
+            }},
+            { label: 'divider', action: () => {}, divider: true }
         ];
 
+        // Conditional items for Mesh type
+        if (entity.type === 'Mesh') {
+            if (!entity.hasCollider) {
+                items.push({ 
+                    label: 'Add Mesh Collider', 
+                    action: () => {
+                        entity.hasCollider = true;
+                        entity.collidable = true; // Auto-enable on add
+                        editorState.notifyTreeChanged();
+                        editorState.notifyTransformChanged();
+                    }
+                });
+            } else {
+                items.push({ 
+                    label: 'Remove Mesh Collider', 
+                    action: () => {
+                        entity.hasCollider = false;
+                        entity.collidable = false;
+                        editorState.notifyTreeChanged();
+                        editorState.notifyTransformChanged();
+                    }
+                });
+            }
+        }
+
         items.forEach((item: any) => {
+            if (item.divider) {
+                const div = document.createElement('div');
+                div.className = 'menu-item-action divider';
+                menu.appendChild(div);
+                return;
+            }
             const el = document.createElement('div');
             el.className = `menu-item-action ${item.disabled ? 'disabled' : ''}`;
             el.innerText = item.label;

@@ -18,6 +18,7 @@ export class InspectorPanel {
         this.sceneManager = sceneManager;
         this.engine = engine;
         editorState.onSelectionChanged.push(() => this.render());
+        editorState.onTransformChanged.push(() => this.render());
         this.render();
     }
 
@@ -95,10 +96,14 @@ export class InspectorPanel {
         }
 
         // ─── Material (Mesh) ─────────────────────────────────────────────
-        if (entity.type === 'Mesh' && bNode instanceof Mesh) {
+        // ─── Material / Mesh Settings ──────────────────────────────────────
+        if (entity.type === 'Mesh' && (bNode instanceof Mesh || entity.meshType === 'ImportedModel')) {
+            const isModel = entity.meshType === 'ImportedModel';
+            
             parts.push(`
-            <div class="insp-section-header">Material</div>
+            <div class="insp-section-header">${isModel ? 'Model Info' : 'Material'}</div>
             <div class="insp-section panel-body">
+                ${!isModel ? `
                 <div class="insp-row">
                     <div class="insp-label">Albedo</div>
                     <div class="insp-field">
@@ -112,20 +117,18 @@ export class InspectorPanel {
                         <label class="insp-toggle">
                             <input type="checkbox" id="emissive-enabled" ${entity.emissiveEnabled ? 'checked' : ''}>
                             <span class="insp-toggle-track"></span>
-                            <span style="font-size: 10px; opacity: 0.7;">On</span>
                         </label>
                         <input type="color" id="mat-emissive" class="insp-color-swatch" value="${entity.materialEmissive}">
                     </div>
                 </div>
+                ` : `
                 <div class="insp-row">
-                    <div class="insp-label">Energy</div>
+                    <div class="insp-label">Asset</div>
                     <div class="insp-field">
-                       <div class="insp-slider-row">
-                           <input type="range" id="emissive-energy-slider" class="insp-slider" min="0" max="10" step="0.1" value="${entity.emissiveIntensity}">
-                           <input type="number" id="emissive-energy-num" class="insp-text-input" style="width: 42px; flex: none;" value="${entity.emissiveIntensity}">
-                       </div>
+                        <div class="asset-tag">${entity.name}</div>
                     </div>
                 </div>
+                `}
                 <div class="insp-row">
                     <div class="insp-label">Cast Shadows</div>
                     <div class="insp-field">
@@ -145,10 +148,10 @@ export class InspectorPanel {
                     </div>
                 </div>
                 <div class="insp-row">
-                    <div class="insp-label">Collidable</div>
+                    <div class="insp-label" title="Enable physical collisions. Requires a Collider.">Collidable</div>
                     <div class="insp-field">
-                        <label class="insp-toggle">
-                            <input type="checkbox" id="prop-collidable" ${entity.collidable ? 'checked' : ''}>
+                        <label class="insp-toggle ${!entity.hasCollider ? 'disabled' : ''}">
+                            <input type="checkbox" id="prop-collidable" ${entity.collidable && entity.hasCollider ? 'checked' : ''} ${!entity.hasCollider ? 'disabled' : ''}>
                             <span class="insp-toggle-track"></span>
                         </label>
                     </div>

@@ -1,5 +1,5 @@
 export type EntityType = 'Node' | 'Mesh' | 'Light' | 'Camera' | 'Sky' | 'Particles';
-export type MeshType = 'Cube' | 'Sphere' | 'Cylinder' | 'Plane' | 'Torus' | 'Capsule' | 'Cone' | 'Disc';
+export type MeshType = 'Cube' | 'Sphere' | 'Cylinder' | 'Plane' | 'Torus' | 'Capsule' | 'Cone' | 'Disc' | 'ImportedModel';
 export type LightType = 'Directional' | 'Point' | 'Spot' | 'Hemispheric';
 
 export class Entity {
@@ -11,6 +11,7 @@ export class Entity {
     // Node type
     public type: EntityType = 'Node';
     public meshType?: MeshType;
+    public modelAssetId: string | null = null;
     public lightType?: LightType;
 
     // Sky / Environment properties
@@ -54,6 +55,7 @@ export class Entity {
 
     // Visibility and Collision
     public visible: boolean = true;
+    public hasCollider: boolean = false;
     public collidable: boolean = true;
 
     // Shadow options

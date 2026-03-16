@@ -54,6 +54,8 @@ interface SerializedEntity {
     groundLevel?: number;
     groundLevelCollidable?: boolean;
     isMainCamera?: boolean;
+    modelAssetId?: string | null;
+    hasCollider?: boolean;
 }
 
 interface SerializedScene {
@@ -134,6 +136,8 @@ export async function saveScene(engine: CoreEngine): Promise<void> {
             groundLevel: entity.groundLevel,
             groundLevelCollidable: entity.groundLevelCollidable,
             isMainCamera: entity.isMainCamera,
+            modelAssetId: entity.modelAssetId,
+            hasCollider: entity.hasCollider,
         });
 
         for (const child of entity.children) queue.push(child);
@@ -212,6 +216,8 @@ export async function loadScene(engine: CoreEngine): Promise<boolean> {
             if (se.groundLevel !== undefined) entity.groundLevel = se.groundLevel;
             if (se.groundLevelCollidable !== undefined) entity.groundLevelCollidable = se.groundLevelCollidable;
             if (se.isMainCamera !== undefined) entity.isMainCamera = se.isMainCamera;
+            if (se.modelAssetId !== undefined) entity.modelAssetId = se.modelAssetId;
+            if (se.hasCollider !== undefined) entity.hasCollider = se.hasCollider;
 
             entityMap.set(se.id, entity);
         }
