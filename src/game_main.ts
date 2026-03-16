@@ -16,6 +16,12 @@ async function initGame() {
     const success = await loadScene(engine);
     
     if (success) {
+        // Apply environment settings from WorldEnvironment entity
+        const skyEntity = Array.from(engine.sceneManager.entities.values()).find(e => e.type === 'Sky');
+        if (skyEntity) {
+            engine.updateEnvironment(skyEntity);
+        }
+        
         if (loading) loading.style.display = 'none';
         console.log("Scene loaded. Starting game...");
         engine.startGame();

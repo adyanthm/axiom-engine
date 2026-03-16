@@ -7,6 +7,21 @@ const DB_VERSION = 1;
 const STORE_NAME = 'scene';
 const SCENE_KEY = 'scene_v1';
 
+// Cache DB connection to avoid reopening
+let _dbPromise: Promise<IDBDatabase> | null = null;
+function getDB(): Promise<IDBDatabase> {
+	if (_dbPromise) return _dbPromise;
+	_dbPromise = new Promise((resolve, reject) => {
+		const req = indexedDB.open(DB_NAME, DB_VERSION);
+		req.onupgradeneeded = () => {
+			req.result.createObjectStore(STORE_NAME);
+		};
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error);
+	});
+	return _dbPromise;
+}
+
 interface SerializedTransform {
     px: number; py: number; pz: number;
     rx: number; ry: number; rz: number;
@@ -61,17 +76,6 @@ interface SerializedEntity {
 interface SerializedScene {
     entities: SerializedEntity[];
     selectedEntityId: string | null;
-}
-
-function openDB(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, DB_VERSION);
-        req.onupgradeneeded = () => {
-            req.result.createObjectStore(STORE_NAME);
-        };
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    });
 }
 
 export async function saveScene(engine: CoreEngine): Promise<void> {
@@ -145,18 +149,17 @@ export async function saveScene(engine: CoreEngine): Promise<void> {
 
     const data: SerializedScene = {
         entities: serialized,
-        selectedEntityId: null, // don't restore selection
+        selectedEntityId: null,
     };
 
     try {
-        const db = await openDB();
+        const db = await getDB();
         const tx = db.transaction(STORE_NAME, 'readwrite');
         tx.objectStore(STORE_NAME).put(data, SCENE_KEY);
         await new Promise<void>((res, rej) => {
             tx.oncomplete = () => res();
             tx.onerror = () => rej(tx.error);
         });
-        db.close();
     } catch (e) {
         console.warn('Failed to save scene:', e);
     }
@@ -164,60 +167,62 @@ export async function saveScene(engine: CoreEngine): Promise<void> {
 
 export async function loadScene(engine: CoreEngine): Promise<boolean> {
     try {
-        const db = await openDB();
+        const db = await getDB();
         const tx = db.transaction(STORE_NAME, 'readonly');
         const req = tx.objectStore(STORE_NAME).get(SCENE_KEY);
         const data: SerializedScene | undefined = await new Promise((res, rej) => {
             req.onsuccess = () => res(req.result);
             req.onerror = () => rej(req.error);
         });
-        db.close();
 
         if (!data || !data.entities || data.entities.length === 0) return false;
 
         const sm = engine.sceneManager;
         const entityMap = new Map<string, Entity>();
 
-        // First pass: create all entities (without parenting)
+        // Single pass: create entities, set properties, and wire parents
         for (const se of data.entities) {
             const entity = sm.forceCreateEntity(se.id, se.name);
             entity.type = se.type;
             entity.meshType = se.meshType;
             entity.lightType = se.lightType;
 
-            if (se.skyTurbidity !== undefined) entity.skyTurbidity = se.skyTurbidity;
-            if (se.skyRayleigh !== undefined) entity.skyRayleigh = se.skyRayleigh;
-            if (se.skyMieCoefficient !== undefined) entity.skyMieCoefficient = se.skyMieCoefficient;
-            if (se.skyMieDirectionalG !== undefined) entity.skyMieDirectionalG = se.skyMieDirectionalG;
-            if (se.skyLuminance !== undefined) entity.skyLuminance = se.skyLuminance;
-            if (se.skyInclination !== undefined) entity.skyInclination = se.skyInclination;
-            if (se.skyAzimuth !== undefined) entity.skyAzimuth = se.skyAzimuth;
-            if (se.environmentIntensity !== undefined) entity.environmentIntensity = se.environmentIntensity;
-            if (se.ambientColor !== undefined) entity.ambientColor = se.ambientColor;
-            if (se.customSkyEnabled !== undefined) entity.customSkyEnabled = se.customSkyEnabled;
-            if (se.skyTopColor !== undefined) entity.skyTopColor = se.skyTopColor;
-            if (se.skyHorizonColor !== undefined) entity.skyHorizonColor = se.skyHorizonColor;
-            if (se.skyCurve !== undefined) entity.skyCurve = se.skyCurve;
-            if (se.skyEnergy !== undefined) entity.skyEnergy = se.skyEnergy;
-            if (se.cameraFollowTargetId !== undefined) entity.cameraFollowTargetId = se.cameraFollowTargetId;
-            if (se.cameraOffset !== undefined) entity.cameraOffset = se.cameraOffset;
-            if (se.script !== undefined) entity.script = se.script;
-            if (se.materialColor !== undefined) entity.materialColor = se.materialColor;
-            if (se.materialEmissive !== undefined) entity.materialEmissive = se.materialEmissive;
-            if (se.emissiveEnabled !== undefined) entity.emissiveEnabled = se.emissiveEnabled;
-            if (se.emissiveIntensity !== undefined) entity.emissiveIntensity = se.emissiveIntensity;
-            if (se.materialMetallic !== undefined) entity.materialMetallic = se.materialMetallic;
-            if (se.materialRoughness !== undefined) entity.materialRoughness = se.materialRoughness;
-            if (se.castShadows !== undefined) entity.castShadows = se.castShadows;
-            if (se.receiveShadows !== undefined) entity.receiveShadows = se.receiveShadows;
-            if (se.visible !== undefined) entity.visible = se.visible;
-            if (se.collidable !== undefined) entity.collidable = se.collidable;
-            if (se.groundLevelEnabled !== undefined) entity.groundLevelEnabled = se.groundLevelEnabled;
-            if (se.groundLevel !== undefined) entity.groundLevel = se.groundLevel;
-            if (se.groundLevelCollidable !== undefined) entity.groundLevelCollidable = se.groundLevelCollidable;
-            if (se.isMainCamera !== undefined) entity.isMainCamera = se.isMainCamera;
-            if (se.modelAssetId !== undefined) entity.modelAssetId = se.modelAssetId;
-            if (se.hasCollider !== undefined) entity.hasCollider = se.hasCollider;
+            // Copy all properties in one go using object spread
+            Object.assign(entity, {
+                skyTurbidity: se.skyTurbidity,
+                skyRayleigh: se.skyRayleigh,
+                skyMieCoefficient: se.skyMieCoefficient,
+                skyMieDirectionalG: se.skyMieDirectionalG,
+                skyLuminance: se.skyLuminance,
+                skyInclination: se.skyInclination,
+                skyAzimuth: se.skyAzimuth,
+                environmentIntensity: se.environmentIntensity,
+                ambientColor: se.ambientColor,
+                customSkyEnabled: se.customSkyEnabled,
+                skyTopColor: se.skyTopColor,
+                skyHorizonColor: se.skyHorizonColor,
+                skyCurve: se.skyCurve,
+                skyEnergy: se.skyEnergy,
+                cameraFollowTargetId: se.cameraFollowTargetId,
+                cameraOffset: se.cameraOffset,
+                script: se.script,
+                materialColor: se.materialColor,
+                materialEmissive: se.materialEmissive,
+                emissiveEnabled: se.emissiveEnabled,
+                emissiveIntensity: se.emissiveIntensity,
+                materialMetallic: se.materialMetallic,
+                materialRoughness: se.materialRoughness,
+                castShadows: se.castShadows,
+                receiveShadows: se.receiveShadows,
+                visible: se.visible,
+                collidable: se.collidable,
+                groundLevelEnabled: se.groundLevelEnabled,
+                groundLevel: se.groundLevel,
+                groundLevelCollidable: se.groundLevelCollidable,
+                isMainCamera: se.isMainCamera,
+                modelAssetId: se.modelAssetId,
+                hasCollider: se.hasCollider,
+            });
 
             entityMap.set(se.id, entity);
         }
@@ -233,10 +238,15 @@ export async function loadScene(engine: CoreEngine): Promise<boolean> {
             }
         }
 
-        // Third pass: sync Babylon nodes and apply transforms
+        // Third pass: sync Babylon nodes, apply transforms, and update environment
         for (const se of data.entities) {
             const entity = entityMap.get(se.id)!;
             engine.syncEntity(entity);
+
+            // Apply environment settings for Sky entities
+            if (entity.type === 'Sky') {
+                engine.updateEnvironment(entity);
+            }
 
             if (se.transform) {
                 const bNode = engine.sceneManager.babylonNodes.get(se.id);

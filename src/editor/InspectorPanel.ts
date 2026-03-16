@@ -394,40 +394,52 @@ export class InspectorPanel {
         this.bindColorPair('#sky-top-color', '#sky-top-hex', hex => {
             entity.skyTopColor = hex;
             this.engine.updateEnvironment(entity);
-            editorState.notifyTransformChanged();
         });
         this.bindColorPair('#sky-hor-color', '#sky-hor-hex', hex => {
             entity.skyHorizonColor = hex;
             this.engine.updateEnvironment(entity);
-            editorState.notifyTransformChanged();
         });
 
-        // Sliders helper
+        // Sliders helper - real-time preview without re-render, save on release
         const setupSlider = (sId: string, nId: string, prop: keyof Entity, toFixedDigits: number = 2) => {
             const s = this.container.querySelector<HTMLInputElement>(`#${sId}`);
             const n = this.container.querySelector<HTMLInputElement>(`#${nId}`);
-            const update = (v: string) => {
+            
+            // Update preview (real-time, no re-render, no save)
+            const updatePreview = (v: string) => {
                 (entity as any)[prop] = parseFloat(v);
                 if (s) s.value = v;
                 if (n) n.value = parseFloat(v).toFixed(toFixedDigits);
                 this.engine.updateEnvironment(entity);
+            };
+            
+            // Save on release
+            const save = () => {
                 editorState.notifyTransformChanged();
             };
-            s?.addEventListener('input', () => update(s.value));
-            n?.addEventListener('input', () => update(n.value));
+            
+            // Slider: real-time preview, save on release
+            s?.addEventListener('input', () => updatePreview(s.value));
+            s?.addEventListener('change', save);
+            
+            // Number input: real-time preview, save on change
+            n?.addEventListener('input', () => updatePreview(n.value));
+            n?.addEventListener('change', save);
         };
 
         // Sliders for Custom Sky
         setupSlider('sky-curve-slider', 'sky-curve-num', 'skyCurve', 3);
         setupSlider('sky-energy-slider', 'sky-energy-num', 'skyEnergy', 1);
 
-        // --- Bind Sky Events ---
+        // --- Bind Sky Events (real-time preview, save on change) ---
         const bind = (id: string, prop: keyof Entity, isNum = true) => {
             const el = this.container.querySelector<HTMLInputElement>(`#${id}`);
             el?.addEventListener('input', () => {
                 const val = isNum ? parseFloat(el.value) : el.value;
                 (entity as any)[prop] = val;
                 this.engine.updateEnvironment(entity);
+            });
+            el?.addEventListener('change', () => {
                 editorState.notifyTransformChanged();
             });
         };
@@ -441,7 +453,6 @@ export class InspectorPanel {
         this.bindColorPair('#ambient-color', '#ambient-color-hex', hex => {
             entity.ambientColor = hex;
             this.engine.updateEnvironment(entity);
-            editorState.notifyTransformChanged();
         });
 
         // Sliders for Sun (Procedural)
@@ -487,12 +498,15 @@ export class InspectorPanel {
             editorState.notifyTreeChanged();
         });
 
-        // Transform
+        // Transform - real-time preview, save on change
         if (bNode instanceof TransformNode) {
             const nb = (sel: string, setter: (v: number) => void) => {
                 this.container.querySelector<HTMLInputElement>(sel)?.addEventListener('input', e => {
                     const v = parseFloat((e.target as HTMLInputElement).value);
-                    if (!isNaN(v)) { setter(v); editorState.notifyTransformChanged(); }
+                    if (!isNaN(v)) setter(v);
+                });
+                this.container.querySelector<HTMLInputElement>(sel)?.addEventListener('change', () => {
+                    editorState.notifyTransformChanged();
                 });
             };
             nb('#px', v => bNode.position.x = v);
@@ -512,12 +526,10 @@ export class InspectorPanel {
             this.bindColorPair('#mat-color', '#mat-color-hex', hex => {
                 entity.materialColor = hex;
                 this.engine.applyMaterialToEntity(entity);
-                editorState.notifyTransformChanged();
             });
             this.bindColorPair('#mat-emissive', '#mat-emissive-hex', hex => {
                 entity.materialEmissive = hex;
                 this.engine.applyMaterialToEntity(entity);
-                editorState.notifyTransformChanged();
             });
             this.container.querySelector<HTMLInputElement>('#emissive-enabled')?.addEventListener('change', e => {
                 entity.emissiveEnabled = (e.target as HTMLInputElement).checked;
@@ -555,11 +567,12 @@ export class InspectorPanel {
         if (bNode instanceof BabylonLight) {
             this.container.querySelector<HTMLInputElement>('#light-intensity')?.addEventListener('input', e => {
                 bNode.intensity = parseFloat((e.target as HTMLInputElement).value);
+            });
+            this.container.querySelector<HTMLInputElement>('#light-intensity')?.addEventListener('change', () => {
                 editorState.notifyTransformChanged();
             });
             this.bindColorPair('#light-color', '#light-color-hex', hex => {
                 bNode.diffuse = Color3.FromHexString(hex);
-                editorState.notifyTransformChanged();
             });
         }
 
@@ -568,7 +581,10 @@ export class InspectorPanel {
             const bind = (id: string, setter: (v: number) => void) => {
                 this.container.querySelector<HTMLInputElement>(`#${id}`)?.addEventListener('input', e => {
                     const v = parseFloat((e.target as HTMLInputElement).value);
-                    if (!isNaN(v)) { setter(v); editorState.notifyTransformChanged(); }
+                    if (!isNaN(v)) setter(v);
+                });
+                this.container.querySelector<HTMLInputElement>(`#${id}`)?.addEventListener('change', () => {
+                    editorState.notifyTransformChanged();
                 });
             };
             bind('cam-fov', v => bNode.fov = v);
@@ -633,12 +649,16 @@ export class InspectorPanel {
         swatch?.addEventListener('input', e => {
             const h = (e.target as HTMLInputElement).value;
             if (hexInput) hexInput.value = h;
-            onChange(h);
+            onChange(h); // Preview only
+        });
+        swatch?.addEventListener('change', () => {
+            editorState.notifyTransformChanged(); // Save on release
         });
         hexInput?.addEventListener('change', e => {
             const h = (e.target as HTMLInputElement).value;
             if (swatch) swatch.value = h;
             onChange(h);
+            editorState.notifyTransformChanged(); // Save on change
         });
     }
 
