@@ -1,5 +1,5 @@
 import {
-    Engine, Scene, ArcRotateCamera, Vector3,
+    Engine, Scene, ArcRotateCamera, Vector3, UniversalCamera,
     HemisphericLight, DirectionalLight, PointLight, SpotLight,
     MeshBuilder, TransformNode, Mesh, Color3, Color4,
     StandardMaterial, GizmoManager,
@@ -14,9 +14,12 @@ import HavokPhysics from '@babylonjs/havok';
 import { SceneManager } from './SceneManager';
 import { Entity } from './Entity';
 import { GameRuntime } from './GameRuntime';
+import { EditorGizmos } from './EditorGizmos';
 import { editorState } from '../editor/EditorState';
 import { assetDB } from '../editor/AssetDatabase';
 import type { GizmoMode } from '../editor/EditorState';
+
+const GIZMO_PREFIX = '__gizmo__';
 
 export class CoreEngine {
     public babylonEngine: Engine;
@@ -28,9 +31,20 @@ export class CoreEngine {
     private runtime: GameRuntime;
     private isPlaying: boolean = false;
     private gizmoManager!: GizmoManager;
+    private editorGizmos!: EditorGizmos;
     private debugLayerVisible = false;
     private physicsViewer: PhysicsViewer | null = null;
     private static _havokInstance: any = null;
+    /** Per-entity shadow generators (DirectionalLight only) */
+    private shadowGenerators: Map<string, ShadowGenerator> = new Map();
+    /** Proxy TransformNodes for lights/cameras so gizmos work on them */
+    private gizmoProxies: Map<string, TransformNode> = new Map();
+    /** Actual Babylon light objects, keyed by entity ID */
+    private lightActuals: Map<string, DirectionalLight | PointLight | SpotLight | HemisphericLight> = new Map();
+
+    public getLightActual(id: string) {
+        return this.lightActuals.get(id);
+    }
 
     constructor(canvas: HTMLCanvasElement) {
         this.babylonEngine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
@@ -43,6 +57,8 @@ export class CoreEngine {
         this.setupEditorEnvironment(canvas);
         this.setupGizmos();
         this.setupPicking();
+
+        this.editorGizmos = new EditorGizmos(this.babylonScene, this.sceneManager);
 
         editorState.onGizmoModeChanged.push((mode) => this.applyGizmoMode(mode));
         editorState.onSelectionChanged.push((id) => this._handleSelectionVisuals(id));
@@ -145,6 +161,17 @@ export class CoreEngine {
         this.gizmoManager.rotationGizmoEnabled = false;
         this.gizmoManager.scaleGizmoEnabled = false;
         this.gizmoManager.boundingBoxGizmoEnabled = false;
+
+        // Notify editor/inspector when gizmos are dragged
+        const notify = () => {
+            if (!this.isPlaying) editorState.notifyTransformChanged();
+        };
+
+        this.gizmoManager.gizmos.positionGizmo?.onDragObservable.add(notify);
+        this.gizmoManager.gizmos.rotationGizmo?.onDragObservable.add(notify);
+        this.gizmoManager.gizmos.scaleGizmo?.onDragObservable.add(notify);
+        this.gizmoManager.gizmos.boundingBoxGizmo?.onScaleBoxDragObservable.add(notify);
+        this.gizmoManager.gizmos.boundingBoxGizmo?.onRotationSphereDragObservable.add(notify);
     }
 
     private applyGizmoMode(mode: GizmoMode) {
@@ -155,17 +182,30 @@ export class CoreEngine {
 
         const id = editorState.selectedEntityId;
         if (!id) return;
-        const node = this.sceneManager.babylonNodes.get(id);
-        
-        // Imported models might be TransformNodes but we want to attach gizmos to them
-        if (node instanceof Mesh || node instanceof TransformNode) {
-            this.gizmoManager.attachToMesh(node as Mesh);
-            if (this.isPlaying) return;
-            if (mode === 'move')   this.gizmoManager.positionGizmoEnabled = true;
-            if (mode === 'rotate') this.gizmoManager.rotationGizmoEnabled = true;
-            if (mode === 'scale')  this.gizmoManager.scaleGizmoEnabled = true;
-            if (mode === 'select') this.gizmoManager.boundingBoxGizmoEnabled = true;
+        if (this.isPlaying) return;
+
+        const entity = this.sceneManager.entities.get(id);
+        if (!entity) return;
+
+        // Scale is NEVER allowed on lights or cameras (physically nonsensical)
+        const allowScale = entity.type !== 'Light' && entity.type !== 'Camera';
+
+        // Use gizmo proxy if available (lights + cameras), else use stored node
+        const proxy = this.gizmoProxies.get(id);
+        const node = proxy ?? this.sceneManager.babylonNodes.get(id);
+        if (!node) return;
+
+        // attachToNode works with any Node (TransformNode, Mesh, etc)
+        (this.gizmoManager as any).attachToNode(node);
+        if (typeof (this.gizmoManager as any).attachToNode !== 'function') {
+            // Fallback if attachToNode not available
+            if (node instanceof Mesh) this.gizmoManager.attachToMesh(node);
         }
+
+        if (mode === 'move')   this.gizmoManager.positionGizmoEnabled = true;
+        if (mode === 'rotate') this.gizmoManager.rotationGizmoEnabled = true;
+        if (mode === 'scale' && allowScale)  this.gizmoManager.scaleGizmoEnabled = true;
+        if (mode === 'select' && allowScale) this.gizmoManager.boundingBoxGizmoEnabled = true;
     }
 
     private _handleSelectionVisuals(selectedId: string | null) {
@@ -180,21 +220,26 @@ export class CoreEngine {
         this.gizmoManager.boundingBoxGizmoEnabled = false;
 
         if (!selectedId) return;
-        const node = this.sceneManager.babylonNodes.get(selectedId);
-        
-        // Handle selection visuals for meshes and imported models
+        const entity = this.sceneManager.entities.get(selectedId);
+        const node   = this.sceneManager.babylonNodes.get(selectedId);
+        const proxy  = this.gizmoProxies.get(selectedId);
+
+        // Show outline on meshes
         if (node instanceof Mesh && !node.name.startsWith('__')) {
             node.renderOutline = true;
-            node.outlineColor = Color3.FromHexString('#ff8800');
-            node.outlineWidth = 0.025;
-            this.applyGizmoMode(editorState.gizmoMode);
+            node.outlineColor  = Color3.FromHexString('#ff8800');
+            node.outlineWidth  = 0.025;
         } else if (node instanceof TransformNode && !node.name.startsWith('__')) {
-            // Outline all meshes under this transform node
             node.getChildMeshes().forEach(m => {
                 m.renderOutline = true;
-                m.outlineColor = Color3.FromHexString('#ff8800');
-                m.outlineWidth = 0.025;
+                m.outlineColor  = Color3.FromHexString('#ff8800');
+                m.outlineWidth  = 0.025;
             });
+        }
+
+        // Always apply gizmo mode when something is selected
+        // (works for meshes, lights via proxy, and cameras via proxy)
+        if (entity && (node instanceof Mesh || node instanceof TransformNode || proxy)) {
             this.applyGizmoMode(editorState.gizmoMode);
         }
     }
@@ -203,20 +248,89 @@ export class CoreEngine {
         this.babylonScene.onPointerDown = (evt, pickResult) => {
             if (this.isPlaying) return;
             if (evt.button !== 0) return;
-            if (pickResult.hit && pickResult.pickedMesh && !pickResult.pickedMesh.name.startsWith('__')) {
-                // Find nearest entity parent in case we picked a child mesh of an imported model
-                let current: BabylonNode | null = pickResult.pickedMesh;
-                while (current) {
-                    const entry = [...this.sceneManager.babylonNodes.entries()].find(([, n]) => n === current);
-                    if (entry) {
-                        editorState.selectEntity(entry[0]);
+            if (pickResult.hit && pickResult.pickedMesh) {
+                const pickedName = pickResult.pickedMesh.name;
+
+                // Check if we clicked a gizmo helper mesh — find its owning entity
+                if (pickedName.startsWith(GIZMO_PREFIX)) {
+                    const uuidMatch = pickedName.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/);
+                    if (uuidMatch) {
+                        editorState.selectEntity(uuidMatch[1]);
                         return;
                     }
-                    current = current.parent;
+                }
+
+                if (!pickedName.startsWith('__')) {
+                    // Find nearest entity parent
+                    let current: BabylonNode | null = pickResult.pickedMesh;
+                    while (current) {
+                        const entry = [...this.sceneManager.babylonNodes.entries()].find(([, n]) => n === current);
+                        if (entry) { editorState.selectEntity(entry[0]); return; }
+                        current = current.parent;
+                    }
                 }
             }
             editorState.clearSelection();
         };
+    }
+
+    public applyShadowSettings(entity: Entity, _bNodeFromInspector: any) {
+        // Always use the actual light object (not proxy TransformNode from Inspector)
+        const light = this.lightActuals.get(entity.id);
+        if (!light || !(light instanceof DirectionalLight)) return;
+
+        const existing = this.shadowGenerators.get(entity.id);
+
+        if (!entity.lightShadowEnabled) {
+            if (existing) { existing.dispose(); this.shadowGenerators.delete(entity.id); }
+            return;
+        }
+
+        // Dispose & recreate when map size changes
+        if (existing && (existing as any)._mapSize !== entity.lightShadowMapSize) {
+            existing.dispose();
+            this.shadowGenerators.delete(entity.id);
+        }
+
+        let gen = this.shadowGenerators.get(entity.id);
+        if (!gen) {
+            gen = new ShadowGenerator(entity.lightShadowMapSize, light);
+            (gen as any)._mapSize = entity.lightShadowMapSize;
+            
+            // Auto-calc frustum for directional shadows
+            if (light instanceof DirectionalLight) {
+                (light as any).autoUpdateExtends = true;
+                (light as any).autoCalcShadowZBounds = true;
+            }
+            
+            this.shadowGenerators.set(entity.id, gen);
+
+            // Register all existing meshes as casters + receivers
+            for (const [id] of this.sceneManager.entities) {
+                const n = this.sceneManager.babylonNodes.get(id);
+                if (n instanceof Mesh) {
+                    gen.addShadowCaster(n, true);
+                    n.receiveShadows = true;
+                } else if (n instanceof TransformNode) {
+                    n.getChildMeshes().forEach(m => {
+                        gen!.addShadowCaster(m, true);
+                        m.receiveShadows = true;
+                    });
+                }
+            }
+        }
+
+        // Apply filter mode
+        switch (entity.lightShadowBlur) {
+            case 'Exponential':     gen.filter = ShadowGenerator.FILTER_EXPONENTIALSHADOWMAP;     break;
+            case 'BlurExponential': gen.filter = ShadowGenerator.FILTER_BLUREXPONENTIALSHADOWMAP; break;
+            case 'PCF':             gen.filter = ShadowGenerator.FILTER_PCF;                        break;
+            case 'PCSS':            gen.filter = ShadowGenerator.FILTER_PCSS;                       break;
+            default:                gen.filter = ShadowGenerator.FILTER_NONE;                       break;
+        }
+
+        gen.setDarkness(entity.lightShadowDarkness);
+        gen.bias = entity.lightShadowBias;
     }
 
     public toggleDebugLayer() {
@@ -377,6 +491,9 @@ export class CoreEngine {
                 mat.diffuseColor = Color3.FromHexString(entity.materialColor);
                 mesh.material = mat;
                 if (this.shadowGenerator) this.shadowGenerator.addShadowCaster(mesh);
+                for (const gen of this.shadowGenerators.values()) {
+                    gen.addShadowCaster(mesh, true);
+                }
                 mesh.receiveShadows = entity.receiveShadows;
                 mesh.position.y = entity.meshType === 'Plane' ? 0 : 0.5;
                 node = mesh;
@@ -385,28 +502,58 @@ export class CoreEngine {
             }
 
         } else if (entity.type === 'Light') {
+            let actualLight: DirectionalLight | PointLight | SpotLight | HemisphericLight;
+
             if (entity.lightType === 'Directional') {
-                const dl = new DirectionalLight(entity.name, new Vector3(-0.5, -1, -0.5), this.babylonScene);
+                const dir = entity.lightDirection ?? { x: -1, y: -2, z: -1 };
+                const dl = new DirectionalLight(entity.name,
+                    new Vector3(dir.x, dir.y, dir.z).normalize(), this.babylonScene);
                 dl.intensity = 1.5;
-                dl.diffuse = new Color3(1, 0.95, 0.85);
-                dl.position = new Vector3(5, 10, 5);
-                node = dl;
+                dl.diffuse   = new Color3(1, 0.95, 0.85);
+                dl.position  = new Vector3(5, 10, 5);
+                actualLight  = dl;
             } else if (entity.lightType === 'Point') {
                 const pl = new PointLight(entity.name, new Vector3(0, 3, 0), this.babylonScene);
-                pl.intensity = 1.0;
-                pl.range = 20;
-                node = pl;
+                pl.intensity = 1.0; pl.range = 20;
+                actualLight  = pl;
             } else if (entity.lightType === 'Spot') {
-                const sl = new SpotLight(entity.name, new Vector3(0, 5, 0), new Vector3(0, -1, 0), Math.PI / 4, 2, this.babylonScene);
+                const sl = new SpotLight(entity.name, new Vector3(0, 5, 0),
+                    new Vector3(0, -1, 0), Math.PI / 4, 2, this.babylonScene);
                 sl.intensity = 1.5;
-                node = sl;
+                actualLight  = sl;
             } else {
                 const hl = new HemisphericLight(entity.name, new Vector3(0, 1, 0), this.babylonScene);
                 hl.intensity = 0.7;
-                node = hl;
+                actualLight  = hl;
             }
+
+            this.lightActuals.set(entity.id, actualLight);
+
+            // Create a proxy TransformNode so the GizmoManager can attach to it
+            const proxy = new TransformNode(`__proxy_light_${entity.id}`, this.babylonScene);
+            proxy.position = (actualLight as any).position?.clone() ?? Vector3.Zero();
+
+            // Every frame: sync proxy's -Z world direction → light.direction
+            //              sync proxy position         → light.position
+            this.babylonScene.onBeforeRenderObservable.add(() => {
+                if (actualLight instanceof DirectionalLight) {
+                    // -Z in local space → world forward direction from proxy
+                    const fwd = Vector3.TransformNormal(
+                        new Vector3(0, 0, -1),
+                        proxy.getWorldMatrix()
+                    ).normalize();
+                    actualLight.direction = fwd;
+                    actualLight.position  = proxy.getAbsolutePosition().clone();
+
+                    // Keep entity lightDirection in sync so Inspector shows correct values
+                    entity.lightDirection = { x: fwd.x, y: fwd.y, z: fwd.z };
+                }
+            });
+
+            this.gizmoProxies.set(entity.id, proxy);
+            node = proxy;   // store proxy so gizmos, picking, etc. all work
         } else if (entity.type === 'Camera') {
-            node = new ArcRotateCamera(entity.name, -Math.PI / 2, Math.PI / 3, 10, Vector3.Zero(), this.babylonScene);
+            node = new UniversalCamera(entity.name, Vector3.Zero(), this.babylonScene);
         } else {
             node = new TransformNode(entity.name, this.babylonScene);
         }
@@ -414,6 +561,9 @@ export class CoreEngine {
         node!.name = entity.name;
         node!.setEnabled(entity.visible);
         this.sceneManager.babylonNodes.set(entity.id, node!);
+
+        // Sync editor gizmo helpers for this entity
+        setTimeout(() => this.editorGizmos?.syncEntity(entity.id, entity), 0);
         
         if (this.isPlaying) {
             this.applyPhysicsToEntity(entity);
@@ -458,7 +608,8 @@ export class CoreEngine {
             
             result.meshes.forEach(m => {
                 m.parent = parent;
-                if (this.shadowGenerator) this.shadowGenerator.addShadowCaster(m);
+                if (this.shadowGenerator) this.shadowGenerator.addShadowCaster(m, true);
+                for (const gen of this.shadowGenerators.values()) gen.addShadowCaster(m, true);
                 m.receiveShadows = entity.receiveShadows;
             });
             console.log(`Successfully loaded model asset: ${asset.name}`);
@@ -535,6 +686,7 @@ export class CoreEngine {
 
     public startGame() {
         this.isPlaying = true;
+        this.editorGizmos?.hideAll();
         editorState.clearSelection();
         
         // Apply physics to all entities
@@ -558,6 +710,7 @@ export class CoreEngine {
     public stopGame() {
         this.isPlaying = false;
         this.runtime.stop();
+        this.editorGizmos?.showAll();
 
         // Remove physics from all entities
         for (const id of this.sceneManager.entities.keys()) {

@@ -1,6 +1,6 @@
 import {
     TransformNode, Color3, Mesh, Observer, Scene,
-    Light as BabylonLight, ArcRotateCamera
+    Light as BabylonLight, UniversalCamera
 } from '@babylonjs/core';
 import { SceneManager } from '../engine/SceneManager';
 import { CoreEngine } from '../engine/CoreEngine';
@@ -41,7 +41,12 @@ export class InspectorPanel {
             return;
         }
 
-        const bNode = this.sceneManager.babylonNodes.get(id);
+        const bNodeRaw = this.sceneManager.babylonNodes.get(id);
+        // For Light entities, the proxy TransformNode is stored in babylonNodes.
+        // Resolve the actual Babylon light object for Inspector bindings.
+        const bNode = (entity.type === 'Light')
+            ? (this.engine.getLightActual(id) ?? bNodeRaw)
+            : bNodeRaw;
         const parts: string[] = [];
 
         // ─── Godot Node Header ──────────────────────────────────────────
@@ -63,8 +68,15 @@ export class InspectorPanel {
         </div>`);
 
         // ─── Transform ───────────────────────────────────────────────────
-        if (bNode instanceof TransformNode) {
-            const p = bNode.position, r = bNode.rotation, s = bNode.scaling;
+        if (bNode instanceof TransformNode || entity.type === 'Light') {
+            const tNode = (entity.type === 'Light')
+                ? this.sceneManager.babylonNodes.get(id) as TransformNode  // use proxy for transform
+                : bNode as TransformNode;
+            const p = tNode?.position  ?? { x: 0, y: 0, z: 0 };
+            const r = tNode?.rotation  ?? { x: 0, y: 0, z: 0 };
+            const s = tNode?.scaling   ?? { x: 1, y: 1, z: 1 };
+            const isLight = entity.type === 'Light';
+            const isCam   = entity.type === 'Camera';
             parts.push(`
             <div class="insp-section-header">Transform</div>
             <div class="insp-section">
@@ -84,14 +96,14 @@ export class InspectorPanel {
                         ${this.coordField('rz', 'z', r.z, '°')}
                     </div>
                 </div>
-                <div class="insp-row">
+                ${(!isLight && !isCam) ? `<div class="insp-row">
                     <div class="insp-label">Scale</div>
                     <div class="insp-field">
                         ${this.coordField('sx', 'x', s.x, '')}
                         ${this.coordField('sy', 'y', s.y, '')}
                         ${this.coordField('sz', 'z', s.z, '')}
                     </div>
-                </div>
+                </div>` : ''}
             </div>`);
         }
 
@@ -221,6 +233,8 @@ export class InspectorPanel {
         // ─── Light ───────────────────────────────────────────────────────
         if (bNode instanceof BabylonLight) {
             const dc = this.color3ToHex(bNode.diffuse);
+            const isDirLight = entity.lightType === 'Directional';
+            const ld = entity.lightDirection ?? { x: -1, y: -2, z: -1 };
             parts.push(`
             <div class="insp-section-header">Light3D</div>
             <div class="insp-section">
@@ -237,11 +251,65 @@ export class InspectorPanel {
                         <input type="text" id="light-color-hex" class="insp-text-input" value="${dc}">
                     </div>
                 </div>
-            </div>`);
+                ${isDirLight ? `
+                <div class="insp-row">
+                    <div class="insp-label" title="Direction the light shines">Direction</div>
+                    <div class="insp-field">
+                        ${this.coordField('ldx', 'x', ld.x, '')}
+                        ${this.coordField('ldy', 'y', ld.y, '')}
+                        ${this.coordField('ldz', 'z', ld.z, '')}
+                    </div>
+                </div>` : ''}
+            </div>
+            ${isDirLight ? `
+            <div class="insp-section-header">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="shadow-enabled" ${entity.lightShadowEnabled ? 'checked' : ''}>
+                    <span>Shadows</span>
+                </label>
+            </div>
+            <div id="shadow-controls" class="insp-section" style="${entity.lightShadowEnabled ? '' : 'display:none;'}">
+                <div class="insp-row">
+                    <div class="insp-label" title="Higher = sharper, more expensive">Map Size</div>
+                    <div class="insp-field">
+                        <select id="shadow-mapsize" class="insp-text-input" style="appearance:auto;-webkit-appearance:auto;">
+                            ${['512','1024','2048','4096'].map(s =>
+                                `<option value="${s}" ${entity.lightShadowMapSize === +s ? 'selected' : ''}>${s}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                </div>
+                <div class="insp-row">
+                    <div class="insp-label" title="Blur algorithm used for soft shadows">Filter</div>
+                    <div class="insp-field">
+                        <select id="shadow-blur" class="insp-text-input" style="appearance:auto;-webkit-appearance:auto;">
+                            ${['None','Exponential','BlurExponential','PCF','PCSS'].map(b =>
+                                `<option value="${b}" ${entity.lightShadowBlur === b ? 'selected' : ''}>${b}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                </div>
+                <div class="insp-row">
+                    <div class="insp-label" title="How dark the shadow is (0=invisible, 1=pitch black)">Darkness</div>
+                    <div class="insp-field">
+                        <div class="insp-slider-row">
+                            <input type="range" id="shadow-darkness-slider" class="insp-slider" min="0" max="1" step="0.01" value="${entity.lightShadowDarkness}">
+                            <input type="number" id="shadow-darkness-num" class="insp-text-input" style="width:42px;flex:none;" value="${entity.lightShadowDarkness.toFixed(2)}">
+                        </div>
+                    </div>
+                </div>
+                <div class="insp-row">
+                    <div class="insp-label" title="Prevents shadow acne on surfaces">Bias</div>
+                    <div class="insp-field">
+                        <input class="insp-text-input" id="shadow-bias" type="number" step="0.00001" value="${entity.lightShadowBias.toFixed(5)}">
+                    </div>
+                </div>
+            </div>` : ''}
+            `);
         }
 
         // ─── Camera ──────────────────────────────────────────────────────
-        if (bNode instanceof ArcRotateCamera) {
+        if (bNode instanceof UniversalCamera) {
             parts.push(`
             <div class="insp-section-header">Camera3D</div>
             <div class="insp-section">
@@ -632,11 +700,71 @@ export class InspectorPanel {
             });
             this.bindColorPair('#light-color', '#light-color-hex', hex => {
                 bNode.diffuse = Color3.FromHexString(hex);
+                editorState.notifyTransformChanged();
             });
+
+            // Direction fields (Directional Light only)
+            if (entity.lightType === 'Directional') {
+                const dirLight = bNode as any; // DirectionalLight
+                const bindDir = (id: string, prop: 'x'|'y'|'z') => {
+                    this.container.querySelector<HTMLInputElement>(`#${id}`)?.addEventListener('input', e => {
+                        const v = parseFloat((e.target as HTMLInputElement).value);
+                        if (!isNaN(v)) {
+                            entity.lightDirection[prop] = v;
+                            if (dirLight.direction) dirLight.direction[prop] = v;
+                            editorState.notifyTransformChanged();
+                        }
+                    });
+                };
+                bindDir('ldx', 'x'); bindDir('ldy', 'y'); bindDir('ldz', 'z');
+
+                // Shadow enable/disable
+                this.container.querySelector<HTMLInputElement>('#shadow-enabled')?.addEventListener('change', e => {
+                    entity.lightShadowEnabled = (e.target as HTMLInputElement).checked;
+                    const ctrl = this.container.querySelector<HTMLElement>('#shadow-controls');
+                    if (ctrl) ctrl.style.display = entity.lightShadowEnabled ? '' : 'none';
+                    this.engine.applyShadowSettings(entity, bNode);
+                    editorState.notifyTransformChanged();
+                });
+
+                // Map size
+                this.container.querySelector<HTMLSelectElement>('#shadow-mapsize')?.addEventListener('change', e => {
+                    entity.lightShadowMapSize = parseInt((e.target as HTMLSelectElement).value);
+                    this.engine.applyShadowSettings(entity, bNode);
+                    editorState.notifyTransformChanged();
+                });
+
+                // Filter/blur type
+                this.container.querySelector<HTMLSelectElement>('#shadow-blur')?.addEventListener('change', e => {
+                    entity.lightShadowBlur = (e.target as HTMLSelectElement).value;
+                    this.engine.applyShadowSettings(entity, bNode);
+                    editorState.notifyTransformChanged();
+                });
+
+                // Darkness
+                const dkSlider = this.container.querySelector<HTMLInputElement>('#shadow-darkness-slider');
+                const dkNum    = this.container.querySelector<HTMLInputElement>('#shadow-darkness-num');
+                const updateDk = (v: string) => {
+                    entity.lightShadowDarkness = parseFloat(v);
+                    if (dkSlider) dkSlider.value = v;
+                    if (dkNum)    dkNum.value    = parseFloat(v).toFixed(2);
+                    this.engine.applyShadowSettings(entity, bNode);
+                    editorState.notifyTransformChanged();
+                };
+                dkSlider?.addEventListener('input', () => updateDk(dkSlider.value));
+                dkNum?.addEventListener('input', () => updateDk(dkNum.value));
+
+                // Bias
+                this.container.querySelector<HTMLInputElement>('#shadow-bias')?.addEventListener('input', e => {
+                    entity.lightShadowBias = parseFloat((e.target as HTMLInputElement).value);
+                    this.engine.applyShadowSettings(entity, bNode);
+                    editorState.notifyTransformChanged();
+                });
+            }
         }
 
         // Camera
-        if (bNode instanceof ArcRotateCamera) {
+        if (bNode instanceof UniversalCamera) {
             const bind = (id: string, setter: (v: number) => void) => {
                 this.container.querySelector<HTMLInputElement>(`#${id}`)?.addEventListener('input', e => {
                     const v = parseFloat((e.target as HTMLInputElement).value);

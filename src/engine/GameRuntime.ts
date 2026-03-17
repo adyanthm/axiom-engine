@@ -55,7 +55,7 @@ export class GameRuntime {
                                 const totalVel = body.getLinearVelocity();
                                 return Math.abs(totalVel.y) < 0.1;
                             }
-                            
+
                             if (!('position' in node)) return false;
                             const pos = (node as any).position;
                             pos.addInPlace(new Vector3(vx * d, vy * d, vz * d));
@@ -139,7 +139,7 @@ export class GameRuntime {
             if (entity.type === 'Camera' && entity.cameraFollowTargetId) {
                 const cam = this.sceneManager.babylonNodes.get(entity.id);
                 const target = this.sceneManager.babylonNodes.get(entity.cameraFollowTargetId);
-                
+
                 if (cam && target && 'position' in cam && 'position' in target) {
                     const targetPos = (target as any).position;
                     const offset = new Vector3(entity.cameraOffset.x, entity.cameraOffset.y, entity.cameraOffset.z);
@@ -154,7 +154,7 @@ export class GameRuntime {
         const keys: Record<string, boolean> = {};
         const onDown = (e: KeyboardEvent) => keys[e.code] = true;
         const onUp = (e: KeyboardEvent) => keys[e.code] = false;
-        
+
         window.addEventListener('keydown', onDown);
         window.addEventListener('keyup', onUp);
 

@@ -5,7 +5,7 @@ class EditorState {
     public selectedEntityId: string | null = null;
     public gizmoMode: GizmoMode = 'select';
     public viewMode: ViewMode = '3d';
-    
+
     public onSelectionChanged: ((id: string | null) => void)[] = [];
     public onTreeChanged: (() => void)[] = [];
     public onGizmoModeChanged: ((mode: GizmoMode) => void)[] = [];

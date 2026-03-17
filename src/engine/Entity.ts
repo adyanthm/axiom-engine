@@ -56,6 +56,14 @@ export class Entity {
     public cameraFollowTargetId: string | null = null;
     public cameraOffset: { x: number, y: number, z: number } = { x: 0, y: 5, z: -10 };
 
+    // Light shadow properties (Directional only for now)
+    public lightShadowEnabled: boolean = false;
+    public lightShadowMapSize: number = 1024;      // 512 | 1024 | 2048 | 4096
+    public lightShadowDarkness: number = 0.3;      // 0..1
+    public lightShadowBias: number = 0.0001;
+    public lightShadowBlur: string = 'BlurExponential'; // None | Exponential | BlurExponential | PCF | PCSS
+    public lightDirection: { x: number, y: number, z: number } = { x: -1, y: -2, z: -1 };
+
     // Scripting
     public script: string = '';
 
