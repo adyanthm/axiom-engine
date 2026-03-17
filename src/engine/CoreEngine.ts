@@ -467,6 +467,72 @@ export class CoreEngine {
         }
     }
 
+    public focusOnEntity(entityId: string) {
+        const cam = this.babylonScene.getCameraByName('editorCamera') as ArcRotateCamera;
+        if (!cam) return;
+
+        const node = this.sceneManager.babylonNodes.get(entityId);
+        if (!node) return;
+
+        // Compute world-space center and bounding radius
+        let center = Vector3.Zero();
+        let radius = 4; // default fallback distance
+
+        if (node instanceof Mesh) {
+            node.computeWorldMatrix(true);
+            const bi = node.getBoundingInfo();
+            center = bi.boundingSphere.centerWorld.clone();
+            radius = Math.max(bi.boundingSphere.radiusWorld * 3.5, 1.5);
+        } else if (node instanceof TransformNode) {
+            node.computeWorldMatrix(true);
+            const childMeshes = node.getChildMeshes();
+            if (childMeshes.length > 0) {
+                // Compute aggregate bounding box over all child meshes
+                let min = new Vector3(Infinity, Infinity, Infinity);
+                let max = new Vector3(-Infinity, -Infinity, -Infinity);
+                childMeshes.forEach(m => {
+                    m.computeWorldMatrix(true);
+                    const bi = m.getBoundingInfo();
+                    min = Vector3.Minimize(min, bi.boundingBox.minimumWorld);
+                    max = Vector3.Maximize(max, bi.boundingBox.maximumWorld);
+                });
+                center = Vector3.Center(min, max);
+                radius = Math.max(Vector3.Distance(min, max) * 1.5, 2);
+            } else {
+                // Empty transform node — just use its position
+                center = node.getAbsolutePosition().clone();
+                radius = 4;
+            }
+        } else if ('position' in node) {
+            // Lights, cameras etc.
+            center = (node as any).position.clone();
+            radius = 6;
+        }
+
+        // Smoothly animate target and radius over ~300ms (20 steps at 60fps)
+        const startTarget = cam.target.clone();
+        const startRadius = cam.radius;
+        const endTarget = center;
+        const endRadius = radius;
+        const steps = 20;
+        let step = 0;
+
+        const animInterval = setInterval(() => {
+            step++;
+            const t = step / steps;
+            const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // ease in-out quad
+
+            cam.target = Vector3.Lerp(startTarget, endTarget, ease);
+            cam.radius = startRadius + (endRadius - startRadius) * ease;
+
+            if (step >= steps) {
+                clearInterval(animInterval);
+                cam.target = endTarget.clone();
+                cam.radius = endRadius;
+            }
+        }, 16);
+    }
+
     public startGame() {
         this.isPlaying = true;
         editorState.clearSelection();

@@ -236,16 +236,33 @@ function _process(delta) {
         colBtn.style.opacity = isMesh ? '1' : '0.4';
         colBtn.style.pointerEvents = isMesh ? 'auto' : 'none';
         
-        if (isMesh && entity.hasCollider) {
-            colBtn.classList.add('active');
+        if (isMesh) {
+            if (entity.hasCollider) {
+                colBtn.innerText = 'Remove mesh collider';
+                colBtn.classList.add('active');
+            } else {
+                colBtn.innerText = 'Add Mesh Collider';
+                colBtn.classList.remove('active');
+            }
         } else {
+            colBtn.innerText = 'Add Mesh Collider';
             colBtn.classList.remove('active');
         }
     }
 
+    updateCollisionBtnState(); // Initialize on load
+
     // Keyboard shortcuts: Q/W/E/R (Godot / Blender style)
     window.addEventListener('keydown', (e) => {
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+        // F = Focus selected object (like Unity/Godot)
+        if (e.key.toLowerCase() === 'f') {
+            const selectedId = editorState.selectedEntityId;
+            if (selectedId) engine.focusOnEntity(selectedId);
+            return;
+        }
+
         const map: Record<string, string> = { 
             q: 'tool-select', 
             w: 'tool-move', 
