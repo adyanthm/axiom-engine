@@ -1,6 +1,6 @@
 import type { Entity, EntityType, MeshType, LightType, PhysicsType } from './Entity';
 import type { CoreEngine } from './CoreEngine';
-import { TransformNode } from '@babylonjs/core';
+import { Vector3 } from '@babylonjs/core';
 
 const DB_NAME = 'AxiomEngine';
 const DB_VERSION = 1;
@@ -10,16 +10,16 @@ const SCENE_KEY = 'scene_v1';
 // Cache DB connection to avoid reopening
 let _dbPromise: Promise<IDBDatabase> | null = null;
 function getDB(): Promise<IDBDatabase> {
-	if (_dbPromise) return _dbPromise;
-	_dbPromise = new Promise((resolve, reject) => {
-		const req = indexedDB.open(DB_NAME, DB_VERSION);
-		req.onupgradeneeded = () => {
-			req.result.createObjectStore(STORE_NAME);
-		};
-		req.onsuccess = () => resolve(req.result);
-		req.onerror = () => reject(req.error);
-	});
-	return _dbPromise;
+    if (_dbPromise) return _dbPromise;
+    _dbPromise = new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = () => {
+            req.result.createObjectStore(STORE_NAME);
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+    return _dbPromise;
 }
 
 interface SerializedTransform {
@@ -36,7 +36,7 @@ interface SerializedEntity {
     lightType?: LightType;
     parentId: string | null;
     transform?: SerializedTransform;
-    
+
     // Properties
     skyTurbidity?: number;
     skyRayleigh?: number;
@@ -114,14 +114,16 @@ export async function saveScene(engine: CoreEngine): Promise<void> {
         const bNode = engine.sceneManager.babylonNodes.get(entity.id);
         let transform: SerializedTransform | undefined;
 
-        if (bNode instanceof TransformNode) {
-            const p = bNode.position;
-            const r = bNode.rotation;
-            const s = bNode.scaling;
+        if (bNode && ('position' in bNode)) {
+            const p = (bNode as any).position;
+            const q = (bNode as any).rotationQuaternion;
+            const r = q ? q.toEulerAngles() : ((bNode as any).rotation ?? Vector3.Zero());
+            const s = (bNode as any).scaling ?? { x: 1, y: 1, z: 1 };
+            
             transform = {
-                px: p.x, py: p.y, pz: p.z,
-                rx: r.x, ry: r.y, rz: r.z,
-                sx: s.x, sy: s.y, sz: s.z,
+                px: Number(p.x || 0), py: Number(p.y || 0), pz: Number(p.z || 0),
+                rx: Number(r.x || 0), ry: Number(r.y || 0), rz: Number(r.z || 0),
+                sx: Number(s.x || 1), sy: Number(s.y || 1), sz: Number(s.z || 1),
             };
         }
 
@@ -133,7 +135,7 @@ export async function saveScene(engine: CoreEngine): Promise<void> {
             lightType: entity.lightType,
             parentId: entity.parent?.id ?? null,
             transform,
-            
+
             skyTurbidity: entity.skyTurbidity,
             skyRayleigh: entity.skyRayleigh,
             skyMieCoefficient: entity.skyMieCoefficient,
@@ -207,6 +209,7 @@ export async function saveScene(engine: CoreEngine): Promise<void> {
             tx.oncomplete = () => res();
             tx.onerror = () => rej(tx.error);
         });
+        console.log(`[ScenePersistence] Saved ${serialized.length} entities to IndexedDB`);
     } catch (e) {
         console.warn('Failed to save scene:', e);
     }
@@ -318,15 +321,22 @@ export async function loadScene(engine: CoreEngine): Promise<boolean> {
             }
 
             if (se.transform) {
-                const bNodeRaw = engine.sceneManager.babylonNodes.get(se.id);
-                const bNode = (entity.type === 'Light')
-                    ? (engine.getLightActual(se.id) ?? bNodeRaw)
-                    : bNodeRaw;
+                const bNode = engine.sceneManager.babylonNodes.get(se.id);
 
-                if (bNode && ('position' in bNode) && ('rotation' in bNode)) {
+                if (bNode && ('position' in bNode)) {
                     const t = se.transform;
                     (bNode as any).position.set(t.px, t.py, t.pz);
-                    (bNode as any).rotation.set(t.rx, t.ry, t.rz);
+
+                    // If the node has a rotationQuaternion (like cameras or lights), 
+                    // we must clear it so our Euler rotation (.rotation) is applied!
+                    if ((bNode as any).rotationQuaternion !== undefined) {
+                        (bNode as any).rotationQuaternion = null;
+                        if ((bNode as any).rotation) {
+                            (bNode as any).rotation.set(t.rx, t.ry, t.rz);
+                        }
+                    } else if ((bNode as any).rotation) {
+                        (bNode as any).rotation.set(t.rx, t.ry, t.rz);
+                    }
                     if ('scaling' in bNode && t.sx !== undefined) {
                         (bNode as any).scaling.set(t.sx, t.sy, t.sz);
                     }

@@ -163,15 +163,21 @@ export class CoreEngine {
         this.gizmoManager.boundingBoxGizmoEnabled = false;
 
         // Notify editor/inspector when gizmos are dragged
-        const notify = () => {
-            if (!this.isPlaying) editorState.notifyTransformChanged();
+        const notifyDrag = () => {
+            if (!this.isPlaying) editorState.notifyTransformChanged(false);
+        };
+        const notifyDragEnd = () => {
+             if (!this.isPlaying) editorState.notifyTransformChanged(true);
         };
 
-        this.gizmoManager.gizmos.positionGizmo?.onDragObservable.add(notify);
-        this.gizmoManager.gizmos.rotationGizmo?.onDragObservable.add(notify);
-        this.gizmoManager.gizmos.scaleGizmo?.onDragObservable.add(notify);
-        this.gizmoManager.gizmos.boundingBoxGizmo?.onScaleBoxDragObservable.add(notify);
-        this.gizmoManager.gizmos.boundingBoxGizmo?.onRotationSphereDragObservable.add(notify);
+        this.gizmoManager.gizmos.positionGizmo?.onDragObservable.add(notifyDrag);
+        this.gizmoManager.gizmos.positionGizmo?.onDragEndObservable.add(notifyDragEnd);
+        this.gizmoManager.gizmos.rotationGizmo?.onDragObservable.add(notifyDrag);
+        this.gizmoManager.gizmos.rotationGizmo?.onDragEndObservable.add(notifyDragEnd);
+        this.gizmoManager.gizmos.scaleGizmo?.onDragObservable.add(notifyDrag);
+        this.gizmoManager.gizmos.scaleGizmo?.onDragEndObservable.add(notifyDragEnd);
+        this.gizmoManager.gizmos.boundingBoxGizmo?.onScaleBoxDragObservable.add(notifyDrag);
+        this.gizmoManager.gizmos.boundingBoxGizmo?.onRotationSphereDragObservable.add(notifyDrag);
     }
 
     private applyGizmoMode(mode: GizmoMode) {
@@ -238,8 +244,8 @@ export class CoreEngine {
         }
 
         // Always apply gizmo mode when something is selected
-        // (works for meshes, lights via proxy, and cameras via proxy)
-        if (entity && (node instanceof Mesh || node instanceof TransformNode || proxy)) {
+        // (works for meshes, lights via proxy, and cameras)
+        if (entity && (node instanceof Mesh || node instanceof TransformNode || node instanceof UniversalCamera || proxy)) {
             this.applyGizmoMode(editorState.gizmoMode);
         }
     }
@@ -495,6 +501,15 @@ export class CoreEngine {
         if (this.sceneManager.babylonNodes.has(entity.id)) {
             if (entity.type === 'Sky') this.updateEnvironment(entity);
             if (entity.type === 'Camera') this.updateCamera(entity);
+            if (entity.type === 'Light') {
+                const actual = this.lightActuals.get(entity.id);
+                if (actual) {
+                    actual.intensity = (entity as any).lightIntensity ?? 1.0;
+                    if ((actual as any).diffuse && (entity as any).lightColor) {
+                        (actual as any).diffuse = Color3.FromHexString((entity as any).lightColor);
+                    }
+                }
+            }
             return;
         }
 
@@ -550,21 +565,19 @@ export class CoreEngine {
                     new Vector3(dir.x, dir.y, dir.z).normalize(), this.babylonScene);
                 dl.intensity = 1.5;
                 dl.diffuse   = new Color3(1, 0.95, 0.85);
-                dl.position  = new Vector3(5, 10, 5);
+                dl.position  = new Vector3(0, 10, 0); // Temporary, fixed in proxy init
                 actualLight  = dl;
             } else if (entity.lightType === 'Point') {
-                const pl = new PointLight(entity.name, new Vector3(0, 3, 0), this.babylonScene);
+                const pl = new PointLight(entity.name, Vector3.Zero(), this.babylonScene);
                 pl.intensity = 1.0; pl.range = 20;
                 actualLight  = pl;
             } else if (entity.lightType === 'Spot') {
-                const sl = new SpotLight(entity.name, new Vector3(0, 5, 0),
+                const sl = new SpotLight(entity.name, Vector3.Zero(),
                     new Vector3(0, -1, 0), Math.PI / 4, 2, this.babylonScene);
                 sl.intensity = 1.5;
                 actualLight  = sl;
             } else {
-                const hl = new HemisphericLight(entity.name, new Vector3(0, 1, 0), this.babylonScene);
-                hl.intensity = 0.7;
-                actualLight  = hl;
+                actualLight = new HemisphericLight(entity.name, Vector3.Up(), this.babylonScene);
             }
 
             this.lightActuals.set(entity.id, actualLight);
@@ -572,6 +585,9 @@ export class CoreEngine {
             // Create a proxy TransformNode so the GizmoManager can attach to it
             const proxy = new TransformNode(`__proxy_light_${entity.id}`, this.babylonScene);
             proxy.position = (actualLight as any).position?.clone() ?? Vector3.Zero();
+            if (actualLight instanceof DirectionalLight) {
+                proxy.lookAt(proxy.position.add(actualLight.direction));
+            }
 
             // Every frame: sync proxy's -Z world direction → light.direction
             //              sync proxy position         → light.position
@@ -600,6 +616,15 @@ export class CoreEngine {
 
         node!.name = entity.name;
         node!.setEnabled(entity.visible);
+        
+        // Sync parent in Babylon
+        if (entity.parent) {
+            const babylonParent = this.sceneManager.babylonNodes.get(entity.parent.id);
+            if (babylonParent) {
+                (node as any).parent = babylonParent;
+            }
+        }
+
         this.sceneManager.babylonNodes.set(entity.id, node!);
 
         // Sync editor gizmo helpers for this entity

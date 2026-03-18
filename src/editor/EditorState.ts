@@ -9,7 +9,7 @@ class EditorState {
     public onSelectionChanged: ((id: string | null) => void)[] = [];
     public onTreeChanged: (() => void)[] = [];
     public onGizmoModeChanged: ((mode: GizmoMode) => void)[] = [];
-    public onTransformChanged: (() => void)[] = [];
+    public onTransformChanged: ((forceNow?: boolean) => void)[] = [];
     public onViewModeChanged: ((mode: ViewMode) => void)[] = [];
 
     setViewMode(mode: ViewMode) {
@@ -43,8 +43,8 @@ class EditorState {
         for (const fn of this.onTreeChanged) fn();
     }
 
-    notifyTransformChanged() {
-        for (const fn of this.onTransformChanged) fn();
+    notifyTransformChanged(forceNow: boolean = false) {
+        for (const fn of this.onTransformChanged) fn(forceNow);
     }
 }
 

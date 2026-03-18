@@ -25,13 +25,13 @@ const initEditor = async () => {
     new HierarchyPanel('scene-tree', sm);
     new InspectorPanel('inspector-content', sm, engine);
     new ScriptPanel('script-panel', sm);
-    
+
     const fsPanel = new FileSystemPanel(document.getElementById('filesystem-tree')!);
-    
+
     // Wire up FileSystem uploads
     const uploadBtn = document.getElementById('btn-upload-asset');
     const uploadInput = document.getElementById('asset-upload-input') as HTMLInputElement;
-    
+
     uploadBtn?.addEventListener('click', () => uploadInput?.click());
     uploadInput?.addEventListener('change', (e) => fsPanel.handleUpload(e));
 
@@ -68,7 +68,10 @@ const initEditor = async () => {
 
     // Auto-save on any change
     editorState.onTreeChanged.push(() => scheduleSave(engine));
-    editorState.onTransformChanged.push(() => scheduleSave(engine));
+    editorState.onTransformChanged.push((forceNow) => {
+        if (forceNow) saveScene(engine);
+        else scheduleSave(engine);
+    });
 
     // --- Viewport Drag & Drop ---
     const viewportPanel = document.getElementById('viewport-panel')!;
@@ -184,7 +187,7 @@ function _process(delta) {
         plane.physicsType = 'Static';
         plane.materialColor = '#2d2d2d';
         engine.syncEntity(plane);
-        
+
         // Setup initial camera follow
         cam.cameraFollowTargetId = cube.id;
         cam.cameraOffset = { x: 0, y: 5, z: -10 };
@@ -233,10 +236,10 @@ function _process(delta) {
         const id = editorState.selectedEntityId;
         const entity = id ? sm.entities.get(id) : null;
         const isMesh = entity && (entity.type === 'Mesh');
-        
+
         colBtn.style.opacity = isMesh ? '1' : '0.4';
         colBtn.style.pointerEvents = isMesh ? 'auto' : 'none';
-        
+
         if (isMesh) {
             if (entity.hasCollider) {
                 colBtn.innerText = 'Remove mesh collider';
@@ -264,10 +267,10 @@ function _process(delta) {
             return;
         }
 
-        const map: Record<string, string> = { 
-            q: 'tool-select', 
-            w: 'tool-move', 
-            e: 'tool-rotate', 
+        const map: Record<string, string> = {
+            q: 'tool-select',
+            w: 'tool-move',
+            e: 'tool-rotate',
             r: 'tool-scale',
             c: 'tool-collision'
         };
@@ -323,10 +326,10 @@ function _process(delta) {
     playBtn?.addEventListener('click', async () => {
         // Save current state first so game window can load it
         await saveScene(engine);
-        
+
         // Open game in new window
         window.open('game.html', '_blank', 'width=1280,height=720');
-        
+
         // For visual feedback in editor
         playBtn.classList.add('active');
         setTimeout(() => playBtn.classList.remove('active'), 1000);
@@ -350,7 +353,7 @@ function _process(delta) {
         const type = selectedItem.dataset.type as any;
         const meshType = selectedItem.dataset.mesh;
         const lightType = selectedItem.dataset.light;
-        
+
         const baseName = meshType || lightType || type;
         nodeCount[baseName] = (nodeCount[baseName] ?? 0) + 1;
         const count = nodeCount[baseName];
@@ -383,11 +386,11 @@ function _process(delta) {
         const onMouseMove = (e: MouseEvent) => {
             const dx = e.clientX - startX;
             let newWidth = isLeft ? (startWidth + dx) : (startWidth - dx);
-            
+
             // Constrain width
             newWidth = Math.max(200, Math.min(600, newWidth));
             sidebar.style.width = `${newWidth}px`;
-            
+
             // Re-sync engine sizes (if needed, Babylon usually handles this on next frame if canvas is % based)
             engine.babylonEngine.resize();
         };
@@ -403,7 +406,7 @@ function _process(delta) {
             startX = e.clientX;
             startWidth = sidebar.getBoundingClientRect().width;
             resizer.classList.add('active');
-            
+
             // Add a glass overlay to capture mouse events even if mouse goes over iframe/canvas
             const overlay = document.createElement('div');
             overlay.className = 'resizer-overlay';
@@ -416,6 +419,11 @@ function _process(delta) {
 
     setupResizer('resizer-left', 'left-sidebar', true);
     setupResizer('resizer-right', 'right-sidebar', false);
+
+    // --- Final Security: Save on refresh/close ---
+    window.addEventListener('beforeunload', () => {
+        saveScene(engine);
+    });
 };
 
 window.addEventListener('DOMContentLoaded', initEditor);

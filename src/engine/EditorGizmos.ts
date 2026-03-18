@@ -32,7 +32,7 @@ export class EditorGizmos {
         this.sceneManager = sceneManager;
 
         editorState.onTreeChanged.push(() => this.syncAll());
-        editorState.onTransformChanged.push(() => this.syncAll());
+        // Movement is now handled via parenting, so onTransformChanged is no longer needed here
     }
 
     // ─── Public API ──────────────────────────────────────────────────────────
@@ -53,6 +53,7 @@ export class EditorGizmos {
     public syncEntity(id: string, entity: Entity) {
         const bNode = this.sceneManager.babylonNodes.get(id);
         if (!bNode) { this.disposeHelpers(id); return; }
+        this.disposeHelpers(id);
 
         if (entity.type === 'Camera') {
             this.buildCameraFrustum(id, bNode as ArcRotateCamera);
@@ -129,6 +130,7 @@ export class EditorGizmos {
 
         // Anchor that follows the camera's eye position and orientation
         const anchor = new TransformNode(`${GIZMO_PREFIX}cam_anchor_${id}`, this.bScene);
+        anchor.parent = cam; // Parent to the actual camera node!
         (frustum as any).parent = anchor;
 
         const updateAnchor = () => {
@@ -160,13 +162,17 @@ export class EditorGizmos {
 
     // ─── Directional Light Sun Icon ──────────────────────────────────────────
 
-    private buildSunIcon(id: string, proxy: TransformNode, entity: Entity) {
+    private buildSunIcon(id: string, proxy: any, entity: Entity) {
         this.disposeHelpers(id);
         const items: Array<Mesh | TransformNode> = [];
 
-        const mat = this.getOrCreateMat(`${GIZMO_PREFIX}light_mat_${id}`, LIGHT_COLOR);
-        const origin = proxy.position?.clone() ?? new Vector3(10, 20, 10);
+        // Main container parented to proxy ensures movement is synced automatically
+        const container = new TransformNode(`${GIZMO_PREFIX}sun_container_${id}`, this.bScene);
+        container.parent = proxy;
+        items.push(container);
 
+        const mat = this.getOrCreateMat(`${GIZMO_PREFIX}light_mat_${id}`, LIGHT_COLOR);
+        
         // ── Sun body (sphere) ──
         const sunBody = MeshBuilder.CreateSphere(
             `${GIZMO_PREFIX}sun_body_${id}`,
@@ -174,8 +180,8 @@ export class EditorGizmos {
             this.bScene
         );
         sunBody.material = mat;
-        sunBody.position = origin.clone();
         sunBody.isPickable = false;
+        (sunBody as any).parent = container;
         items.push(sunBody);
 
         // ── Rays (8 short lines radiating outward) ──
@@ -197,7 +203,7 @@ export class EditorGizmos {
 
         // Anchor for rays so we can billboard them
         const rayAnchor = new TransformNode(`${GIZMO_PREFIX}ray_anchor_${id}`, this.bScene);
-        rayAnchor.position = origin.clone();
+        rayAnchor.parent = container;
 
         const rays = MeshBuilder.CreateLineSystem(
             `${GIZMO_PREFIX}sun_rays_${id}`,
@@ -214,13 +220,15 @@ export class EditorGizmos {
         const edZ = entity.lightDirection?.z ?? -1;
         const dir = new Vector3(edX, edY, edZ).normalizeToNew();
         
-        const arrowEnd   = origin.add(dir.scale(2.0));
+        // Arrow is parented to container (proxy position), so it starts at Zero locally
+        const arrowStart = Vector3.Zero();
+        const arrowEnd   = dir.scale(2.0);
         const perpV      = this.perp(dir).scale(0.2);
         const arrowHead1 = arrowEnd.subtract(dir.scale(0.4)).add(perpV);
         const arrowHead2 = arrowEnd.subtract(dir.scale(0.4)).subtract(perpV);
 
         const arrowLines: Vector3[][] = [
-            [origin.clone(), arrowEnd],
+            [arrowStart, arrowEnd],
             [arrowEnd, arrowHead1],
             [arrowEnd, arrowHead2],
         ];
@@ -233,6 +241,7 @@ export class EditorGizmos {
             this.bScene
         ) as unknown as Mesh;
         arrow.isPickable = false;
+        (arrow as any).parent = container;
         items.push(arrow);
 
         // ── Billboard update: make the sun body + rays face the editor camera ──
@@ -240,7 +249,8 @@ export class EditorGizmos {
             const cam = this.bScene.getCameraByName('editorCamera') as ArcRotateCamera | null;
             if (!cam) return;
 
-            const toCamera = cam.globalPosition.subtract(origin).normalize();
+            const sunPos = container.getAbsolutePosition();
+            const toCamera = cam.globalPosition.subtract(sunPos).normalize();
             const worldUp  = Vector3.Up();
             const right    = Vector3.Cross(toCamera, worldUp).normalize();
             const realUp   = Vector3.Cross(right, toCamera).normalize();

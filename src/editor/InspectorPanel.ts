@@ -47,6 +47,9 @@ export class InspectorPanel {
         const bNode = (entity.type === 'Light')
             ? (this.engine.getLightActual(id) ?? bNodeRaw)
             : bNodeRaw;
+        
+        // Always use the 'raw' node (proxy for lights/cameras) for transform bindings!
+        const tBindNode = bNodeRaw as any;
         const parts: string[] = [];
 
         // ─── Godot Node Header ──────────────────────────────────────────
@@ -376,7 +379,7 @@ export class InspectorPanel {
         this.container.innerHTML = parts.join('');
 
         // ═══ Event Bindings ═══════════════════════════════════════════════
-        this.bindBaseEvents(entity, bNode);
+        this.bindBaseEvents(entity, bNode, tBindNode);
     }
 
     private renderSkySettings(entity: Entity) {
@@ -634,7 +637,7 @@ export class InspectorPanel {
         </div>`;
     }
 
-    private bindBaseEvents(entity: Entity, bNode: any) {
+    private bindBaseEvents(entity: Entity, bNode: any, tBindNode: any) {
         // Name
         const nameEl = this.container.querySelector<HTMLInputElement>('#prop-name');
         nameEl?.addEventListener('change', () => {
@@ -644,7 +647,7 @@ export class InspectorPanel {
         });
 
         // Transform - real-time preview, save on change
-        if (bNode instanceof TransformNode || entity.type === 'Camera' || entity.type === 'Light') {
+        if (tBindNode && ('position' in tBindNode)) {
             const nb = (sel: string, setter: (v: number) => void) => {
                 this.container.querySelector<HTMLInputElement>(sel)?.addEventListener('input', e => {
                     const v = parseFloat((e.target as HTMLInputElement).value);
@@ -654,16 +657,23 @@ export class InspectorPanel {
                     editorState.notifyTransformChanged();
                 });
             };
-            nb('#px', v => bNode.position.x = v);
-            nb('#py', v => bNode.position.y = v);
-            nb('#pz', v => bNode.position.z = v);
-            nb('#rx', v => bNode.rotation.x = v);
-            nb('#ry', v => bNode.rotation.y = v);
-            nb('#rz', v => bNode.rotation.z = v);
-            nb('#sx', v => bNode.scaling.x = Math.max(0.0001, v));
-            nb('#sy', v => bNode.scaling.y = Math.max(0.0001, v));
-            nb('#sz', v => bNode.scaling.z = Math.max(0.0001, v));
-            this.startLiveSync(bNode);
+            nb('#px', v => tBindNode.position.x = v);
+            nb('#py', v => tBindNode.position.y = v);
+            nb('#pz', v => tBindNode.position.z = v);
+            
+            // For rotation, we MUST clear rotationQuaternion so Euler values work
+            const setRot = (axis: 'x' | 'y' | 'z', v: number) => {
+                if (tBindNode.rotationQuaternion) tBindNode.rotationQuaternion = null;
+                tBindNode.rotation[axis] = v;
+            };
+            nb('#rx', v => setRot('x', v));
+            nb('#ry', v => setRot('y', v));
+            nb('#rz', v => setRot('z', v));
+            
+            nb('#sx', v => tBindNode.scaling.x = Math.max(0.0001, v));
+            nb('#sy', v => tBindNode.scaling.y = Math.max(0.0001, v));
+            nb('#sz', v => tBindNode.scaling.z = Math.max(0.0001, v));
+            this.startLiveSync(tBindNode);
         }
 
         // Material
