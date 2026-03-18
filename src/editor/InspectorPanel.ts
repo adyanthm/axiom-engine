@@ -163,10 +163,10 @@ export class InspectorPanel {
                     </div>
                 </div>
                 <div class="insp-row">
-                    <div class="insp-label" title="Enable physical collisions. Requires a Collider.">Collidable</div>
+                    <div class="insp-label" title="Enable physical collisions.">Collidable</div>
                     <div class="insp-field">
-                        <label class="insp-toggle ${!entity.hasCollider ? 'disabled' : ''}">
-                            <input type="checkbox" id="prop-collidable" ${entity.collidable && entity.hasCollider ? 'checked' : ''} ${!entity.hasCollider ? 'disabled' : ''}>
+                        <label class="insp-toggle ${(!entity.hasCollider && entity.meshType === 'ImportedModel') ? 'disabled' : ''}">
+                            <input type="checkbox" id="prop-collidable" ${entity.collidable ? 'checked' : ''} ${(!entity.hasCollider && entity.meshType === 'ImportedModel') ? 'disabled' : ''}>
                             <span class="insp-toggle-track"></span>
                         </label>
                     </div>
@@ -907,6 +907,14 @@ export class InspectorPanel {
         bindCheck('phys-lock-x', 'lockRotationX');
         bindCheck('phys-lock-y', 'lockRotationY');
         bindCheck('phys-lock-z', 'lockRotationZ');
+
+        this.container.querySelector<HTMLInputElement>('#prop-collidable')?.addEventListener('change', (e) => {
+            entity.collidable = (e.target as HTMLInputElement).checked;
+            this.engine.applyPhysicsToEntity(entity);
+            const node = this.sceneManager.babylonNodes.get(entity.id);
+            if (node) this.engine.updateColliderVisuals(entity, node);
+            editorState.notifyTransformChanged();
+        });
     }
 
     private getFollowTargetOptions(currentId: string | null): string {

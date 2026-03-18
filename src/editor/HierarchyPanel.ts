@@ -121,8 +121,8 @@ export class HierarchyPanel {
             { label: 'divider', action: () => {}, divider: true }
         ];
 
-        // Conditional items for Mesh type
-        if (entity.type === 'Mesh') {
+        // Conditional items for Mesh type (only for imported models)
+        if (entity.type === 'Mesh' && entity.meshType === 'ImportedModel') {
             if (!entity.hasCollider) {
                 items.push({ 
                     label: 'Add Mesh Collider', 

@@ -650,7 +650,8 @@ export class CoreEngine {
         const meshes = (node instanceof Mesh) ? [node] : node.getChildMeshes();
         
         meshes.forEach(m => {
-            if (entity.physicsType !== 'None' && !this.isPlaying) {
+            // Only show blue overlay in editor AND only if physics is active AND it is collidable
+            if (!this.isPlaying && entity.physicsType !== 'None' && entity.collidable) {
                 m.renderOverlay = true;
                 m.overlayColor = new Color3(0.4, 0.7, 1.0); // Light Blue
                 m.overlayAlpha = 0.25; // Semi-transparent
@@ -751,6 +752,7 @@ export class CoreEngine {
 
     public startGame() {
         this.isPlaying = true;
+        this.refreshAllColliderVisuals();
         this.editorGizmos?.hideAll();
         
         // Respect Sky showGrid setting
@@ -792,6 +794,7 @@ export class CoreEngine {
 
     public stopGame() {
         this.isPlaying = false;
+        this.refreshAllColliderVisuals();
         this.runtime.stop();
         this.editorGizmos?.showAll();
         this.babylonScene.getMeshByName('__grid__')?.setEnabled(true);
@@ -875,8 +878,13 @@ export class CoreEngine {
             }
 
             // Collision Filters
-            aggregate.shape.filterMembershipMask = entity.collisionLayer;
-            aggregate.shape.filterCollideMask = entity.collisionMask;
+            if (entity.collidable) {
+                aggregate.shape.filterMembershipMask = entity.collisionLayer;
+                aggregate.shape.filterCollideMask = entity.collisionMask;
+            } else {
+                aggregate.shape.filterMembershipMask = 0;
+                aggregate.shape.filterCollideMask = 0;
+            }
             
             (node as any).physicsBody = aggregate.body;
         } catch (e) {
