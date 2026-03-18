@@ -1,7 +1,7 @@
 import {
     Scene, Mesh, MeshBuilder, Vector3, Color3, Color4,
     StandardMaterial, TransformNode,
-    ArcRotateCamera, UniversalCamera,
+    ArcRotateCamera,
     Quaternion, Matrix
 } from '@babylonjs/core';
 import { SceneManager } from './SceneManager';
@@ -9,9 +9,9 @@ import { Entity } from './Entity';
 import { editorState } from '../editor/EditorState';
 
 const GIZMO_PREFIX = '__gizmo__';
-const CAM_COLOR = new Color3(0.55, 0.82, 1.0);   // sky-blue for cameras
-const LIGHT_COLOR = new Color3(1.0, 0.85, 0.2);   // warm yellow for directional lights
-const DIM_ALPHA = 0.6;
+const CAM_COLOR    = new Color3(0.55, 0.82, 1.0);   // sky-blue for cameras
+const LIGHT_COLOR  = new Color3(1.0,  0.85, 0.2);   // warm yellow for directional lights
+const DIM_ALPHA    = 0.6;
 
 /**
  * Manages all editor-only helper wireframe / icon meshes.
@@ -25,6 +25,7 @@ export class EditorGizmos {
     private sceneManager: SceneManager;
     /** entityId → array of helper objects owned by that entity */
     private helpers: Map<string, Array<Mesh | TransformNode>> = new Map();
+    private isVisible: boolean = true;
 
     constructor(babylonScene: Scene, sceneManager: SceneManager) {
         this.bScene = babylonScene;
@@ -54,19 +55,27 @@ export class EditorGizmos {
         if (!bNode) { this.disposeHelpers(id); return; }
 
         if (entity.type === 'Camera') {
-            this.buildCameraFrustum(id, bNode as UniversalCamera);
+            this.buildCameraFrustum(id, bNode as ArcRotateCamera);
         } else if (entity.type === 'Light' && entity.lightType === 'Directional') {
             this.buildSunIcon(id, bNode as TransformNode, entity);
         } else {
             this.disposeHelpers(id);
         }
+
+        // Apply current visibility state to newly created helpers
+        const items = this.helpers.get(id);
+        if (items) {
+            items.forEach(m => m.setEnabled(this.isVisible));
+        }
     }
 
     public showAll() {
+        this.isVisible = true;
         this.helpers.forEach(items => items.forEach(m => m.setEnabled(true)));
     }
 
     public hideAll() {
+        this.isVisible = false;
         this.helpers.forEach(items => items.forEach(m => m.setEnabled(false)));
     }
 
@@ -76,29 +85,29 @@ export class EditorGizmos {
 
     // ─── Camera Frustum ──────────────────────────────────────────────────────
 
-    private buildCameraFrustum(id: string, cam: UniversalCamera) {
+    private buildCameraFrustum(id: string, cam: ArcRotateCamera) {
         this.disposeHelpers(id);
         const items: Array<Mesh | TransformNode> = [];
 
-        const fov = cam.fov ?? 0.8;
+        const fov    = cam.fov    ?? 0.8;
         const aspect = this.bScene.getEngine().getAspectRatio(cam);
-        const near = 0.15;
-        const far = 2.5;
+        const near   = 0.15;
+        const far    = 2.5;
 
         const hnear = Math.tan(fov / 2) * near;
-        const hfar = Math.tan(fov / 2) * far;
+        const hfar  = Math.tan(fov / 2) * far;
         const wnear = hnear * aspect;
-        const wfar = hfar * aspect;
+        const wfar  = hfar  * aspect;
 
         // Corners in camera-local space (looking down +Z from the origin)
-        const NTL = new Vector3(-wnear, hnear, near);
-        const NTR = new Vector3(wnear, hnear, near);
+        const NTL = new Vector3(-wnear,  hnear, near);
+        const NTR = new Vector3( wnear,  hnear, near);
         const NBL = new Vector3(-wnear, -hnear, near);
-        const NBR = new Vector3(wnear, -hnear, near);
-        const FTL = new Vector3(-wfar, hfar, far);
-        const FTR = new Vector3(wfar, hfar, far);
-        const FBL = new Vector3(-wfar, -hfar, far);
-        const FBR = new Vector3(wfar, -hfar, far);
+        const NBR = new Vector3( wnear, -hnear, near);
+        const FTL = new Vector3(-wfar,   hfar,  far);
+        const FTR = new Vector3( wfar,   hfar,  far);
+        const FBL = new Vector3(-wfar,  -hfar,  far);
+        const FBR = new Vector3( wfar,  -hfar,  far);
 
         const c4 = new Color4(CAM_COLOR.r, CAM_COLOR.g, CAM_COLOR.b, DIM_ALPHA);
         const lines: Vector3[][] = [
@@ -126,13 +135,13 @@ export class EditorGizmos {
             anchor.position.copyFrom(cam.globalPosition);
             // Build rotation from camera axes
             const forward = cam.getForwardRay(1).direction.normalize();
-            const up = cam.upVector.normalize();
-            const right = Vector3.Cross(forward, up).normalize();
-            const realUp = Vector3.Cross(right, forward).normalize();
+            const up      = cam.upVector.normalize();
+            const right   = Vector3.Cross(forward, up).normalize();
+            const realUp  = Vector3.Cross(right, forward).normalize();
             // Matrix col-major (Babylon is row-major internally, but FromValues is column)
             const m = Matrix.FromValues(
-                right.x, right.y, right.z, 0,
-                realUp.x, realUp.y, realUp.z, 0,
+                right.x,   right.y,   right.z,   0,
+                realUp.x,  realUp.y,  realUp.z,  0,
                 forward.x, forward.y, forward.z, 0,
                 0, 0, 0, 1
             );
@@ -204,9 +213,9 @@ export class EditorGizmos {
         const edY = entity.lightDirection?.y ?? -2;
         const edZ = entity.lightDirection?.z ?? -1;
         const dir = new Vector3(edX, edY, edZ).normalizeToNew();
-
-        const arrowEnd = origin.add(dir.scale(2.0));
-        const perpV = this.perp(dir).scale(0.2);
+        
+        const arrowEnd   = origin.add(dir.scale(2.0));
+        const perpV      = this.perp(dir).scale(0.2);
         const arrowHead1 = arrowEnd.subtract(dir.scale(0.4)).add(perpV);
         const arrowHead2 = arrowEnd.subtract(dir.scale(0.4)).subtract(perpV);
 
@@ -232,13 +241,13 @@ export class EditorGizmos {
             if (!cam) return;
 
             const toCamera = cam.globalPosition.subtract(origin).normalize();
-            const worldUp = Vector3.Up();
-            const right = Vector3.Cross(toCamera, worldUp).normalize();
-            const realUp = Vector3.Cross(right, toCamera).normalize();
+            const worldUp  = Vector3.Up();
+            const right    = Vector3.Cross(toCamera, worldUp).normalize();
+            const realUp   = Vector3.Cross(right, toCamera).normalize();
 
             const bm = Matrix.FromValues(
-                right.x, right.y, right.z, 0,
-                realUp.x, realUp.y, realUp.z, 0,
+                right.x,   right.y,   right.z,   0,
+                realUp.x,  realUp.y,  realUp.z,  0,
                 toCamera.x, toCamera.y, toCamera.z, 0,
                 0, 0, 0, 1
             );
@@ -266,7 +275,7 @@ export class EditorGizmos {
         const existing = this.bScene.getMaterialByName(name) as StandardMaterial | null;
         if (existing) return existing;
         const mat = new StandardMaterial(name, this.bScene);
-        mat.diffuseColor = color;
+        mat.diffuseColor  = color;
         mat.emissiveColor = color.scale(0.75);
         mat.disableLighting = true;
         return mat;

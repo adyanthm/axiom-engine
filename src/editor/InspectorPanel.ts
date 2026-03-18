@@ -1,6 +1,6 @@
 import {
     TransformNode, Color3, Mesh, Observer, Scene,
-    Light as BabylonLight, UniversalCamera
+    Light as BabylonLight
 } from '@babylonjs/core';
 import { SceneManager } from '../engine/SceneManager';
 import { CoreEngine } from '../engine/CoreEngine';
@@ -26,7 +26,7 @@ export class InspectorPanel {
         this.stopLiveSync();
 
         const id = editorState.selectedEntityId;
-        
+
         // --- Special case: No selection = Show help text or global settings ---
         if (!id) {
             this.renderEmptyState();
@@ -68,15 +68,15 @@ export class InspectorPanel {
         </div>`);
 
         // ─── Transform ───────────────────────────────────────────────────
-        if (bNode instanceof TransformNode || entity.type === 'Light') {
+        if (bNode instanceof TransformNode || entity.type === 'Light' || entity.type === 'Camera') {
             const tNode = (entity.type === 'Light')
-                ? this.sceneManager.babylonNodes.get(id) as TransformNode  // use proxy for transform
-                : bNode as TransformNode;
-            const p = tNode?.position  ?? { x: 0, y: 0, z: 0 };
-            const r = tNode?.rotation  ?? { x: 0, y: 0, z: 0 };
-            const s = tNode?.scaling   ?? { x: 1, y: 1, z: 1 };
+                ? this.sceneManager.babylonNodes.get(id) as any
+                : bNode as any;
+            const p = tNode?.position ?? { x: 0, y: 0, z: 0 };
+            const r = tNode?.rotation ?? { x: 0, y: 0, z: 0 };
+            const s = tNode?.scaling ?? { x: 1, y: 1, z: 1 };
             const isLight = entity.type === 'Light';
-            const isCam   = entity.type === 'Camera';
+            const isCam = entity.type === 'Camera';
             parts.push(`
             <div class="insp-section-header">Transform</div>
             <div class="insp-section">
@@ -111,7 +111,7 @@ export class InspectorPanel {
         // ─── Material / Mesh Settings ──────────────────────────────────────
         if (entity.type === 'Mesh' && (bNode instanceof Mesh || entity.meshType === 'ImportedModel')) {
             const isModel = entity.meshType === 'ImportedModel';
-            
+
             parts.push(`
             <div class="insp-section-header">${isModel ? 'Model Info' : 'Material'}</div>
             <div class="insp-section panel-body">
@@ -273,9 +273,9 @@ export class InspectorPanel {
                     <div class="insp-label" title="Higher = sharper, more expensive">Map Size</div>
                     <div class="insp-field">
                         <select id="shadow-mapsize" class="insp-text-input" style="appearance:auto;-webkit-appearance:auto;">
-                            ${['512','1024','2048','4096'].map(s =>
-                                `<option value="${s}" ${entity.lightShadowMapSize === +s ? 'selected' : ''}>${s}</option>`
-                            ).join('')}
+                            ${['512', '1024', '2048', '4096'].map(s =>
+                `<option value="${s}" ${entity.lightShadowMapSize === +s ? 'selected' : ''}>${s}</option>`
+            ).join('')}
                         </select>
                     </div>
                 </div>
@@ -283,9 +283,9 @@ export class InspectorPanel {
                     <div class="insp-label" title="Blur algorithm used for soft shadows">Filter</div>
                     <div class="insp-field">
                         <select id="shadow-blur" class="insp-text-input" style="appearance:auto;-webkit-appearance:auto;">
-                            ${['None','Exponential','BlurExponential','PCF','PCSS'].map(b =>
-                                `<option value="${b}" ${entity.lightShadowBlur === b ? 'selected' : ''}>${b}</option>`
-                            ).join('')}
+                            ${['None', 'Exponential', 'BlurExponential', 'PCF', 'PCSS'].map(b =>
+                `<option value="${b}" ${entity.lightShadowBlur === b ? 'selected' : ''}>${b}</option>`
+            ).join('')}
                         </select>
                     </div>
                 </div>
@@ -309,26 +309,27 @@ export class InspectorPanel {
         }
 
         // ─── Camera ──────────────────────────────────────────────────────
-        if (bNode instanceof UniversalCamera) {
+        if (entity.type === 'Camera') {
+            const bCam = bNode as any;
             parts.push(`
             <div class="insp-section-header">Camera3D</div>
             <div class="insp-section">
                 <div class="insp-row">
                     <div class="insp-label">FOV</div>
                     <div class="insp-field">
-                        <input class="insp-text-input" id="cam-fov" type="number" step="0.01" value="${bNode.fov.toFixed(2)}">
+                        <input class="insp-text-input" id="cam-fov" type="number" step="0.01" value="${bCam?.fov?.toFixed(2) ?? '0.80'}">
                     </div>
                 </div>
                 <div class="insp-row">
                     <div class="insp-label">Near</div>
                     <div class="insp-field">
-                        <input class="insp-text-input" id="cam-near" type="number" step="0.1" value="${bNode.minZ.toFixed(2)}">
+                        <input class="insp-text-input" id="cam-near" type="number" step="0.1" value="${bCam?.minZ?.toFixed(2) ?? '0.10'}">
                     </div>
                 </div>
                 <div class="insp-row">
                     <div class="insp-label">Far</div>
                     <div class="insp-field">
-                        <input class="insp-text-input" id="cam-far" type="number" step="10" value="${bNode.maxZ.toFixed(0)}">
+                        <input class="insp-text-input" id="cam-far" type="number" step="10" value="${bCam?.maxZ?.toFixed(0) ?? '1000'}">
                     </div>
                 </div>
                 <div class="insp-row">
@@ -336,6 +337,15 @@ export class InspectorPanel {
                     <div class="insp-field">
                         <label class="insp-toggle">
                             <input type="checkbox" id="cam-is-main" ${entity.isMainCamera ? 'checked' : ''}>
+                            <span class="insp-toggle-track"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="insp-row">
+                    <div class="insp-label" title="Unlock orbit/zoom controls while playing">Debug Camera</div>
+                    <div class="insp-field">
+                        <label class="insp-toggle">
+                            <input type="checkbox" id="cam-debug" ${entity.debugCamera ? 'checked' : ''}>
                             <span class="insp-toggle-track"></span>
                         </label>
                     </div>
@@ -496,11 +506,13 @@ export class InspectorPanel {
                     <input class="insp-text-input" id="ground-y" type="number" step="0.1" value="${entity.groundLevel.toFixed(2)}">
                 </div>
             </div>
-            <div class="insp-row" id="ground-coll-row" style="${entity.groundLevelEnabled ? '' : 'display: none;'}">
-                <div class="insp-label">Collidable</div>
+                </div>
+            </div>
+            <div class="insp-row">
+                <div class="insp-label">Show Grid</div>
                 <div class="insp-field">
                     <label class="insp-toggle">
-                        <input type="checkbox" id="ground-collidable" ${entity.groundLevelCollidable ? 'checked' : ''}>
+                        <input type="checkbox" id="ground-grid-visible" ${entity.showGrid ? 'checked' : ''}>
                         <span class="insp-toggle-track"></span>
                     </label>
                 </div>
@@ -531,7 +543,7 @@ export class InspectorPanel {
         const setupSlider = (sId: string, nId: string, prop: keyof Entity, toFixedDigits: number = 2) => {
             const s = this.container.querySelector<HTMLInputElement>(`#${sId}`);
             const n = this.container.querySelector<HTMLInputElement>(`#${nId}`);
-            
+
             // Update preview (real-time, no re-render, no save)
             const updatePreview = (v: string) => {
                 (entity as any)[prop] = parseFloat(v);
@@ -539,16 +551,16 @@ export class InspectorPanel {
                 if (n) n.value = parseFloat(v).toFixed(toFixedDigits);
                 this.engine.updateEnvironment(entity);
             };
-            
+
             // Save on release
             const save = () => {
                 editorState.notifyTransformChanged();
             };
-            
+
             // Slider: real-time preview, save on release
             s?.addEventListener('input', () => updatePreview(s.value));
             s?.addEventListener('change', save);
-            
+
             // Number input: real-time preview, save on change
             n?.addEventListener('input', () => updatePreview(n.value));
             n?.addEventListener('change', save);
@@ -605,6 +617,12 @@ export class InspectorPanel {
             entity.groundLevel = parseFloat(gY.value) || 0;
             editorState.notifyTransformChanged();
         });
+
+        const gGrid = this.container.querySelector<HTMLInputElement>('#ground-grid-visible');
+        gGrid?.addEventListener('change', () => {
+            entity.showGrid = gGrid.checked;
+            editorState.notifyTransformChanged();
+        });
     }
 
     private renderEmptyState() {
@@ -626,7 +644,7 @@ export class InspectorPanel {
         });
 
         // Transform - real-time preview, save on change
-        if (bNode instanceof TransformNode) {
+        if (bNode instanceof TransformNode || entity.type === 'Camera' || entity.type === 'Light') {
             const nb = (sel: string, setter: (v: number) => void) => {
                 this.container.querySelector<HTMLInputElement>(sel)?.addEventListener('input', e => {
                     const v = parseFloat((e.target as HTMLInputElement).value);
@@ -706,7 +724,7 @@ export class InspectorPanel {
             // Direction fields (Directional Light only)
             if (entity.lightType === 'Directional') {
                 const dirLight = bNode as any; // DirectionalLight
-                const bindDir = (id: string, prop: 'x'|'y'|'z') => {
+                const bindDir = (id: string, prop: 'x' | 'y' | 'z') => {
                     this.container.querySelector<HTMLInputElement>(`#${id}`)?.addEventListener('input', e => {
                         const v = parseFloat((e.target as HTMLInputElement).value);
                         if (!isNaN(v)) {
@@ -743,11 +761,11 @@ export class InspectorPanel {
 
                 // Darkness
                 const dkSlider = this.container.querySelector<HTMLInputElement>('#shadow-darkness-slider');
-                const dkNum    = this.container.querySelector<HTMLInputElement>('#shadow-darkness-num');
+                const dkNum = this.container.querySelector<HTMLInputElement>('#shadow-darkness-num');
                 const updateDk = (v: string) => {
                     entity.lightShadowDarkness = parseFloat(v);
                     if (dkSlider) dkSlider.value = v;
-                    if (dkNum)    dkNum.value    = parseFloat(v).toFixed(2);
+                    if (dkNum) dkNum.value = parseFloat(v).toFixed(2);
                     this.engine.applyShadowSettings(entity, bNode);
                     editorState.notifyTransformChanged();
                 };
@@ -764,7 +782,7 @@ export class InspectorPanel {
         }
 
         // Camera
-        if (bNode instanceof UniversalCamera) {
+        if (entity.type === 'Camera') {
             const bind = (id: string, setter: (v: number) => void) => {
                 this.container.querySelector<HTMLInputElement>(`#${id}`)?.addEventListener('input', e => {
                     const v = parseFloat((e.target as HTMLInputElement).value);
@@ -774,16 +792,29 @@ export class InspectorPanel {
                     editorState.notifyTransformChanged();
                 });
             };
-            bind('cam-fov', v => bNode.fov = v);
-            bind('cam-near', v => bNode.minZ = v);
-            bind('cam-far', v => bNode.maxZ = v);
+            const bCam = bNode as any;
+            bind('cam-fov', v => bCam.fov = v);
+            bind('cam-near', v => bCam.minZ = v);
+            bind('cam-far', v => bCam.maxZ = v);
+
+            this.container.querySelector<HTMLInputElement>('#cam-is-main')?.addEventListener('change', e => {
+                entity.isMainCamera = (e.target as HTMLInputElement).checked;
+                this.engine.syncEntity(entity);
+                editorState.notifyTransformChanged();
+            });
+
+            this.container.querySelector<HTMLInputElement>('#cam-debug')?.addEventListener('change', e => {
+                entity.debugCamera = (e.target as HTMLInputElement).checked;
+                this.engine.syncEntity(entity);
+                editorState.notifyTransformChanged();
+            });
 
             this.container.querySelector<HTMLSelectElement>('#cam-follow-target')?.addEventListener('change', e => {
                 entity.cameraFollowTargetId = (e.target as HTMLSelectElement).value || null;
                 editorState.notifyTransformChanged();
             });
 
-            const bindOff = (id: string, prop: 'x'|'y'|'z') => {
+            const bindOff = (id: string, prop: 'x' | 'y' | 'z') => {
                 this.container.querySelector<HTMLInputElement>(`#${id}`)?.addEventListener('input', e => {
                     entity.cameraOffset[prop] = parseFloat((e.target as HTMLInputElement).value);
                     editorState.notifyTransformChanged();
@@ -793,7 +824,7 @@ export class InspectorPanel {
 
             this.container.querySelector<HTMLInputElement>('#cam-is-main')?.addEventListener('change', e => {
                 const checked = (e.target as HTMLInputElement).checked;
-                
+
                 if (checked) {
                     // Turn off any other main camera
                     for (const other of this.sceneManager.entities.values()) {
@@ -804,7 +835,7 @@ export class InspectorPanel {
                 } else {
                     entity.isMainCamera = false;
                 }
-                
+
                 editorState.notifyTreeChanged(); // Icon in tree might change
                 editorState.notifyTransformChanged(); // For saving
             });
@@ -925,16 +956,23 @@ export class InspectorPanel {
         });
     }
 
-    private startLiveSync(tn: TransformNode) {
+    private startLiveSync(tn: any) {
         this.syncObserver = this.engine.babylonScene.onBeforeRenderObservable.add(() => {
             if (document.activeElement?.tagName === 'INPUT') return;
             const set = (id: string, v: number) => {
                 const el = this.container.querySelector<HTMLInputElement>(`#${id}`);
                 if (el) el.value = v.toFixed(3);
             };
-            set('px', tn.position.x); set('py', tn.position.y); set('pz', tn.position.z);
-            set('rx', tn.rotation.x); set('ry', tn.rotation.y); set('rz', tn.rotation.z);
-            set('sx', tn.scaling.x); set('sy', tn.scaling.y); set('sz', tn.scaling.z);
+            
+            if (tn.position) {
+                set('px', tn.position.x); set('py', tn.position.y); set('pz', tn.position.z);
+            }
+            if (tn.rotation) {
+                set('rx', tn.rotation.x); set('ry', tn.rotation.y); set('rz', tn.rotation.z);
+            }
+            if (tn.scaling) {
+                set('sx', tn.scaling.x); set('sy', tn.scaling.y); set('sz', tn.scaling.z);
+            }
         });
     }
 

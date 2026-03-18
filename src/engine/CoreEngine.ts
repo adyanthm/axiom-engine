@@ -429,6 +429,13 @@ export class CoreEngine {
             }
         }
 
+        // Handle Grid visibility
+        const grid = this.babylonScene.getMeshByName('__grid__');
+        if (grid) {
+            // In editor it is always visible. In play it depends on entity.showGrid
+            grid.setEnabled(this.isPlaying ? entity.showGrid : true);
+        }
+
         // Handle Global Ground Physics
         const groundBodyName = '__global_physics_ground__';
         let groundNode = this.babylonScene.getMeshByName(groundBodyName);
@@ -452,9 +459,42 @@ export class CoreEngine {
         }
     }
 
+    public updateCamera(entity: Entity) {
+        if (entity.type !== 'Camera') return;
+        const bCam = this.sceneManager.babylonNodes.get(entity.id) as UniversalCamera;
+        if (!bCam) return;
+
+        if (this.isPlaying) {
+            const editorCam = this.babylonScene.getCameraByName('editorCamera') as ArcRotateCamera;
+            
+            if (entity.debugCamera) {
+                // Switch to the orbit/debug camera
+                this.babylonScene.activeCamera = editorCam;
+                editorCam.attachControl(this.babylonEngine.getRenderingCanvas(), true);
+                
+                // Copy game camera current view as a starting point
+                editorCam.setPosition(bCam.position.clone());
+                const forward = bCam.getDirection(Vector3.Forward());
+                editorCam.setTarget(bCam.position.add(forward.scale(10)));
+            } else {
+                // Return to the main game camera view
+                const mainCamEntity = Array.from(this.sceneManager.entities.values()).find(e => e.type === 'Camera' && e.isMainCamera);
+                if (mainCamEntity) {
+                    const mainBCam = this.sceneManager.babylonNodes.get(mainCamEntity.id) as UniversalCamera;
+                    if (mainBCam) {
+                        this.babylonScene.activeCamera = mainBCam;
+                    }
+                }
+                editorCam.detachControl();
+            }
+        }
+    }
+
+
     public syncEntity(entity: Entity) {
         if (this.sceneManager.babylonNodes.has(entity.id)) {
             if (entity.type === 'Sky') this.updateEnvironment(entity);
+            if (entity.type === 'Camera') this.updateCamera(entity);
             return;
         }
 
@@ -687,6 +727,13 @@ export class CoreEngine {
     public startGame() {
         this.isPlaying = true;
         this.editorGizmos?.hideAll();
+        
+        // Respect Sky showGrid setting
+        const skyEntity = Array.from(this.sceneManager.entities.values()).find(e => e.type === 'Sky');
+        if (skyEntity) {
+            this.babylonScene.getMeshByName('__grid__')?.setEnabled(skyEntity.showGrid);
+        }
+        
         editorState.clearSelection();
         
         // Apply physics to all entities
@@ -696,12 +743,23 @@ export class CoreEngine {
 
         const mainCamEntity = Array.from(this.sceneManager.entities.values()).find(e => e.type === 'Camera' && e.isMainCamera);
         if (mainCamEntity) {
-            const bCam = this.sceneManager.babylonNodes.get(mainCamEntity.id) as ArcRotateCamera;
+            const bCam = this.sceneManager.babylonNodes.get(mainCamEntity.id) as UniversalCamera;
             if (bCam) {
-                const editorCam = this.babylonScene.getCameraByName('editorCamera');
+                const editorCam = this.babylonScene.getCameraByName('editorCamera') as ArcRotateCamera;
                 editorCam?.detachControl();
-                this.babylonScene.activeCamera = bCam;
-                bCam.attachControl(this.babylonEngine.getRenderingCanvas(), true);
+                
+                if (mainCamEntity.debugCamera) {
+                    this.babylonScene.activeCamera = editorCam;
+                    editorCam.attachControl(this.babylonEngine.getRenderingCanvas(), true);
+                    
+                    // Initial sync of the debug view to the game camera
+                    editorCam.setPosition(bCam.position.clone());
+                    const forward = bCam.getDirection(Vector3.Forward());
+                    editorCam.setTarget(bCam.position.add(forward.scale(10)));
+                } else {
+                    this.babylonScene.activeCamera = bCam;
+                    bCam.detachControl(); // Keep fixed
+                }
             }
         }
         this.runtime.start();
@@ -711,6 +769,7 @@ export class CoreEngine {
         this.isPlaying = false;
         this.runtime.stop();
         this.editorGizmos?.showAll();
+        this.babylonScene.getMeshByName('__grid__')?.setEnabled(true);
 
         // Remove physics from all entities
         for (const id of this.sceneManager.entities.keys()) {
@@ -718,6 +777,14 @@ export class CoreEngine {
             if (node && (node as any).physicsBody) {
                 (node as any).physicsBody.dispose();
                 (node as any).physicsBody = null;
+            }
+        }
+
+        // Detach controls from all scene cameras
+        for (const [id, entity] of this.sceneManager.entities) {
+            if (entity.type === 'Camera') {
+                const bCam = this.sceneManager.babylonNodes.get(id);
+                if (bCam && 'detachControl' in bCam) (bCam as any).detachControl();
             }
         }
 

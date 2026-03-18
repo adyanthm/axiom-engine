@@ -6,7 +6,10 @@ export class GameRuntime {
     private activeScripts: Map<string, any> = new Map();
     private isRunning: boolean = false;
 
-    constructor(_scene: Scene, sceneManager: SceneManager) {
+    private scene: Scene;
+
+    constructor(scene: Scene, sceneManager: SceneManager) {
+        this.scene = scene;
         this.sceneManager = sceneManager;
     }
 
@@ -55,7 +58,7 @@ export class GameRuntime {
                                 const totalVel = body.getLinearVelocity();
                                 return Math.abs(totalVel.y) < 0.1;
                             }
-
+                            
                             if (!('position' in node)) return false;
                             const pos = (node as any).position;
                             pos.addInPlace(new Vector3(vx * d, vy * d, vz * d));
@@ -137,14 +140,26 @@ export class GameRuntime {
 
         for (const entity of Array.from(this.sceneManager.entities.values())) {
             if (entity.type === 'Camera' && entity.cameraFollowTargetId) {
-                const cam = this.sceneManager.babylonNodes.get(entity.id);
-                const target = this.sceneManager.babylonNodes.get(entity.cameraFollowTargetId);
+                const targetNode = this.sceneManager.babylonNodes.get(entity.cameraFollowTargetId);
+                if (targetNode && 'position' in targetNode) {
+                    const targetPos = (targetNode as any).position;
 
-                if (cam && target && 'position' in cam && 'position' in target) {
-                    const targetPos = (target as any).position;
-                    const offset = new Vector3(entity.cameraOffset.x, entity.cameraOffset.y, entity.cameraOffset.z);
-                    (cam as any).position.copyFrom(targetPos.add(offset));
-                    (cam as any).setTarget(targetPos);
+                    if (entity.debugCamera) {
+                        // In debug mode, we just update the target of the active camera (ArcRotate)
+                        // so that it follows the object while allowing manual orbit.
+                        const activeCam = this.scene.activeCamera;
+                        if (activeCam && (activeCam as any).setTarget) {
+                            (activeCam as any).setTarget(targetPos);
+                        }
+                    } else {
+                        // Standard mode: fixed follow
+                        const cam = this.sceneManager.babylonNodes.get(entity.id);
+                        if (cam && 'position' in cam) {
+                            const offset = new Vector3(entity.cameraOffset.x, entity.cameraOffset.y, entity.cameraOffset.z);
+                            (cam as any).position.copyFrom(targetPos.add(offset));
+                            (cam as any).setTarget(targetPos);
+                        }
+                    }
                 }
             }
         }
@@ -154,7 +169,7 @@ export class GameRuntime {
         const keys: Record<string, boolean> = {};
         const onDown = (e: KeyboardEvent) => keys[e.code] = true;
         const onUp = (e: KeyboardEvent) => keys[e.code] = false;
-
+        
         window.addEventListener('keydown', onDown);
         window.addEventListener('keyup', onUp);
 

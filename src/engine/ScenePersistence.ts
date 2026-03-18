@@ -84,6 +84,18 @@ interface SerializedEntity {
     lockRotationX?: boolean;
     lockRotationY?: boolean;
     lockRotationZ?: boolean;
+
+    // Grid and Camera
+    showGrid?: boolean;
+    debugCamera?: boolean;
+
+    // Shadows and Light
+    lightShadowEnabled?: boolean;
+    lightShadowMapSize?: number;
+    lightShadowDarkness?: number;
+    lightShadowBias?: number;
+    lightShadowBlur?: string;
+    lightDirection?: { x: number, y: number, z: number };
 }
 
 interface SerializedScene {
@@ -167,6 +179,16 @@ export async function saveScene(engine: CoreEngine): Promise<void> {
             lockRotationX: entity.lockRotationX,
             lockRotationY: entity.lockRotationY,
             lockRotationZ: entity.lockRotationZ,
+
+            showGrid: entity.showGrid,
+            debugCamera: entity.debugCamera,
+
+            lightShadowEnabled: entity.lightShadowEnabled,
+            lightShadowMapSize: entity.lightShadowMapSize,
+            lightShadowDarkness: entity.lightShadowDarkness,
+            lightShadowBias: entity.lightShadowBias,
+            lightShadowBlur: entity.lightShadowBlur,
+            lightDirection: entity.lightDirection,
         });
 
         for (const child of entity.children) queue.push(child);
@@ -259,6 +281,16 @@ export async function loadScene(engine: CoreEngine): Promise<boolean> {
                 lockRotationX: se.lockRotationX ?? entity.lockRotationX,
                 lockRotationY: se.lockRotationY ?? entity.lockRotationY,
                 lockRotationZ: se.lockRotationZ ?? entity.lockRotationZ,
+
+                showGrid: se.showGrid ?? entity.showGrid,
+                debugCamera: se.debugCamera ?? entity.debugCamera,
+
+                lightShadowEnabled: se.lightShadowEnabled ?? entity.lightShadowEnabled,
+                lightShadowMapSize: se.lightShadowMapSize ?? entity.lightShadowMapSize,
+                lightShadowDarkness: se.lightShadowDarkness ?? entity.lightShadowDarkness,
+                lightShadowBias: se.lightShadowBias ?? entity.lightShadowBias,
+                lightShadowBlur: se.lightShadowBlur ?? entity.lightShadowBlur,
+                lightDirection: se.lightDirection ? { ...se.lightDirection } : entity.lightDirection,
             });
 
             entityMap.set(se.id, entity);
@@ -286,12 +318,18 @@ export async function loadScene(engine: CoreEngine): Promise<boolean> {
             }
 
             if (se.transform) {
-                const bNode = engine.sceneManager.babylonNodes.get(se.id);
-                if (bNode instanceof TransformNode) {
+                const bNodeRaw = engine.sceneManager.babylonNodes.get(se.id);
+                const bNode = (entity.type === 'Light')
+                    ? (engine.getLightActual(se.id) ?? bNodeRaw)
+                    : bNodeRaw;
+
+                if (bNode && ('position' in bNode) && ('rotation' in bNode)) {
                     const t = se.transform;
-                    bNode.position.set(t.px, t.py, t.pz);
-                    bNode.rotation.set(t.rx, t.ry, t.rz);
-                    bNode.scaling.set(t.sx, t.sy, t.sz);
+                    (bNode as any).position.set(t.px, t.py, t.pz);
+                    (bNode as any).rotation.set(t.rx, t.ry, t.rz);
+                    if ('scaling' in bNode && t.sx !== undefined) {
+                        (bNode as any).scaling.set(t.sx, t.sy, t.sz);
+                    }
                 }
             }
         }

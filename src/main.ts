@@ -66,8 +66,9 @@ const initEditor = async () => {
         scriptPanel.classList.toggle('hidden', mode !== 'script');
     });
 
-    // Auto-save on any tree change (add node, rename, etc.)
+    // Auto-save on any change
     editorState.onTreeChanged.push(() => scheduleSave(engine));
+    editorState.onTransformChanged.push(() => scheduleSave(engine));
 
     // --- Viewport Drag & Drop ---
     const viewportPanel = document.getElementById('viewport-panel')!;
