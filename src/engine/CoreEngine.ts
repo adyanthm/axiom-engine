@@ -650,6 +650,12 @@ export class CoreEngine {
         const meshes = (node instanceof Mesh) ? [node] : node.getChildMeshes();
         
         meshes.forEach(m => {
+            if (m.name.startsWith('__physics_collider__')) {
+                m.renderOverlay = false;
+                m.isVisible = false;
+                return;
+            }
+
             // Only show blue overlay in editor AND only if physics is active AND it is collidable
             if (!this.isPlaying && entity.physicsType !== 'None' && entity.collidable) {
                 m.renderOverlay = true;
@@ -669,20 +675,35 @@ export class CoreEngine {
             if (!asset || !asset.data) return;
 
             const base64 = asset.data as string;
-            // Babylon can load from base64 data URLs
             const result = await SceneLoader.ImportMeshAsync("", "", base64, this.babylonScene);
             
             result.meshes.forEach(m => {
-                m.parent = parent;
+                // Only parent top-level nodes from the imported file to avoid flattening hierarchy
+                if (!m.parent) {
+                    m.parent = parent;
+                    // Standardize: clear Babylon's automatic root handedness conversion (often 90 deg rotation)
+                    if (m.name === "__root__" || m === result.meshes[0]) {
+                        m.rotationQuaternion = null;
+                        m.rotation = Vector3.Zero();
+                    }
+                }
+                
                 if (this.shadowGenerator) this.shadowGenerator.addShadowCaster(m, true);
                 for (const gen of this.shadowGenerators.values()) gen.addShadowCaster(m, true);
                 m.receiveShadows = entity.receiveShadows;
             });
             console.log(`Successfully loaded model asset: ${asset.name}`);
+            
+            // Re-apply physics now that the actual geometry is loaded
+            if (entity.hasCollider) {
+                this.applyPhysicsToEntity(entity);
+                this.updateColliderVisuals(entity, parent);
+            }
         } catch (e) {
             console.error("Failed to load imported model:", e);
         }
     }
+
 
     public focusOnEntity(entityId: string) {
         const cam = this.babylonScene.getCameraByName('editorCamera') as ArcRotateCamera;
@@ -838,6 +859,7 @@ export class CoreEngine {
         // Determine shape and override for Planes (Ground)
         let shapeType = PhysicsShapeType.BOX;
         let extents: Vector3 | undefined;
+        let mergedMesh: Mesh | null = null;
 
         if (entity.type === 'Mesh') {
             if (entity.meshType === 'Sphere') shapeType = PhysicsShapeType.SPHERE;
@@ -847,7 +869,60 @@ export class CoreEngine {
                 // Force a thickness for planes so objects don't tunnel through
                 extents = new Vector3(5, 0.1, 5); 
             }
-            else if (entity.meshType === 'ImportedModel') shapeType = PhysicsShapeType.MESH;
+            else if (entity.meshType === 'ImportedModel') {
+                const childMeshes = node.getChildMeshes();
+                if (childMeshes.length === 0) return; // Wait for async load to finish
+
+                // Dispose of any old collider
+                const oldCollider = node.getChildren((n) => n.name === '__physics_collider__', true)[0] as Mesh;
+                if (oldCollider) oldCollider.dispose();
+
+                // 1. Attempt to create a precise MESH collider by merging all valid child geometries
+                const meshesToMerge: Mesh[] = [];
+                childMeshes.forEach(m => {
+                    if (m instanceof Mesh && m.name !== '__physics_collider__' && m.getTotalVertices() > 0) {
+                        const clone = m.clone('__temp_clone__');
+                        if (clone) {
+                            clone.setParent(null); // Detach for a clean world-space merge
+                            clone.computeWorldMatrix(true);
+                            meshesToMerge.push(clone);
+                        }
+                    }
+                });
+
+                if (meshesToMerge.length > 0) {
+
+                    try {
+                        mergedMesh = Mesh.MergeMeshes(meshesToMerge, true, true, undefined, false, true);
+                        if (mergedMesh) {
+                            mergedMesh.name = '__physics_collider__';
+                            mergedMesh.setParent(node);
+                            mergedMesh.isVisible = false;
+                            mergedMesh.isPickable = false;
+                            
+                            shapeType = PhysicsShapeType.MESH;
+                            // We will assign this to props.mesh later
+                        }
+                    } catch (e) {
+                        console.warn('Mesh merging for precise collider failed, falling back to BOX extents:', e);
+                        mergedMesh = null;
+                    }
+                }
+
+                // 2. Fallback to a precise Bounding BOX if there were no valid geometries or merge failed
+                if (!mergedMesh) {
+                    shapeType = PhysicsShapeType.BOX;
+                    let min = new Vector3(Infinity, Infinity, Infinity);
+                    let max = new Vector3(-Infinity, -Infinity, -Infinity);
+                    childMeshes.forEach(m => {
+                        m.computeWorldMatrix(true);
+                        const bi = m.getBoundingInfo().boundingBox;
+                        min = Vector3.Minimize(min, bi.minimum);
+                        max = Vector3.Maximize(max, bi.maximum);
+                    });
+                    extents = max.subtract(min);
+                }
+            }
         }
 
         let motionType = PhysicsMotionType.STATIC;
@@ -861,8 +936,10 @@ export class CoreEngine {
                 restitution: entity.restitution
             };
             if (extents) props.extents = extents;
+            
+            const physicsTarget = (entity.meshType === 'ImportedModel' && mergedMesh) ? mergedMesh : node;
 
-            const aggregate = new PhysicsAggregate(node, shapeType, props, this.babylonScene);
+            const aggregate = new PhysicsAggregate(physicsTarget, shapeType, props, this.babylonScene);
 
             aggregate.body.setMotionType(motionType);
             aggregate.body.setLinearDamping(entity.linearDamping);
