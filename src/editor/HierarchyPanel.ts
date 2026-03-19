@@ -8,6 +8,7 @@ export class HierarchyPanel {
     private sceneManager: SceneManager;
     private collapsed: Set<string> = new Set();
     private filterText: string = '';
+    private draggedEntityId: string | null = null;
 
     constructor(containerId: string, sceneManager: SceneManager) {
         this.container = document.getElementById(containerId)!;
@@ -24,8 +25,9 @@ export class HierarchyPanel {
                 .explorer-list::-webkit-scrollbar-track { background: transparent; }
                 .explorer-list::-webkit-scrollbar-thumb { background: #5a5f66; border-radius: 3px; }
                 .explorer-list::-webkit-scrollbar-thumb:hover { background: #7f8a9e; }
-                .tree-item { user-select: none; }
+                .tree-item { user-select: none; position: relative; }
                 .tree-item:hover { background-color: rgba(255, 255, 255, 0.05) !important; }
+                .tree-item.drop-target { background-color: rgba(138, 180, 248, 0.2) !important; border-bottom: 2px solid #8ab4f8; }
             `;
             document.head.appendChild(style);
         }
@@ -73,6 +75,24 @@ export class HierarchyPanel {
         const listContainer = document.createElement('div');
         listContainer.className = 'explorer-list';
         listContainer.style.paddingLeft = '4px';
+        listContainer.style.height = '100%'; // Allow dropping on empty space to root
+
+        // Drag over empty space to reparent to root
+        listContainer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer!.dropEffect = 'move';
+        });
+
+        listContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const draggedId = e.dataTransfer!.getData('entityId') || this.draggedEntityId;
+            if (draggedId) {
+                this.sceneManager.reparentEntity(draggedId, null);
+                this.draggedEntityId = null;
+                this.render(); // Immediate update
+                editorState.notifyTreeChanged();
+            }
+        });
 
         for (const child of this.sceneManager.root.children) {
             this.renderNode(child, 0, listContainer);
@@ -96,25 +116,82 @@ export class HierarchyPanel {
         row.className = 'tree-item';
         row.dataset.id = entity.id;
         row.dataset.name = entity.name.toLowerCase();
+        row.draggable = true;
+        
         row.style.display = 'flex';
         row.style.alignItems = 'center';
         row.style.padding = '4px 14px';
         row.style.paddingLeft = `${14 + depth * 16}px`;
         row.style.cursor = 'pointer';
-        row.style.fontSize = '12px';
         row.style.color = '#e8eaed';
+        row.style.fontSize = '12px';
+        row.style.transition = 'background-color 0.1s';
+        row.style.borderBottom = '1px solid transparent'; // For drop indicator
 
+        // Drag & Drop Logic
+        row.addEventListener('dragstart', (e) => {
+            this.draggedEntityId = entity.id;
+            e.dataTransfer!.setData('entityId', entity.id);
+            e.dataTransfer!.effectAllowed = 'move';
+            row.style.opacity = '0.5';
+        });
+
+        row.addEventListener('dragend', () => {
+            row.style.opacity = '1';
+            this.draggedEntityId = null;
+            this.container.querySelectorAll('.tree-item').forEach(el => (el as HTMLElement).classList.remove('drop-target'));
+        });
+
+        row.addEventListener('dragover', (e) => {
+            if (this.draggedEntityId && this.draggedEntityId !== entity.id) {
+                // Check for infinite recursion
+                let isDescendant = false;
+                let check: Entity | null = entity;
+                while (check) {
+                    if (check.id === this.draggedEntityId) { isDescendant = true; break; }
+                    check = check.parent;
+                }
+
+                if (!isDescendant) {
+                    e.preventDefault();
+                    e.stopPropagation(); // Don't let parent nodes or the root list catch this
+                    row.classList.add('drop-target');
+                    e.dataTransfer!.dropEffect = 'move';
+                }
+            }
+        });
+
+        row.addEventListener('dragleave', (e) => {
+            e.stopPropagation();
+            row.classList.remove('drop-target');
+        });
+
+        row.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            row.classList.remove('drop-target');
+            
+            const draggedId = e.dataTransfer!.getData('entityId') || this.draggedEntityId;
+            if (draggedId && draggedId !== entity.id) {
+                this.sceneManager.reparentEntity(draggedId, entity.id);
+                this.collapsed.delete(entity.id); // Auto-expand target
+                this.render(); // Immediate update
+                editorState.notifyTreeChanged();
+            }
+            this.draggedEntityId = null;
+        });
+
+        // Arrow for folding
+        const arrow = document.createElement('div');
+        arrow.style.width = '14px';
+        arrow.style.marginRight = '2px';
+        arrow.style.color = '#9aa0a6';
+        
         const isCollapsed = this.collapsed.has(entity.id);
         const hasChildren = entity.children.length > 0;
 
-        // Expansion arrow
-        const arrow = document.createElement('div');
-        arrow.style.width = '16px';
-        arrow.style.display = 'flex';
-        arrow.style.justifyContent = 'center';
-        
         if (hasChildren) {
-            arrow.innerHTML = `<i data-lucide="${isCollapsed ? 'chevron-right' : 'chevron-down'}" style="width:14px; height:14px; color:#9aa0a6;"></i>`;
+            arrow.innerHTML = `<i data-lucide="${isCollapsed ? 'chevron-right' : 'chevron-down'}" style="width:14px; height:14px;"></i>`;
             arrow.onclick = (e) => {
                 e.stopPropagation();
                 if (isCollapsed) this.collapsed.delete(entity.id);

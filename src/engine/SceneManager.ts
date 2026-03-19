@@ -36,6 +36,32 @@ export class SceneManager {
         this.entities.delete(id);
     }
 
+    reparentEntity(entityId: string, newParentId: string | null) {
+        const entity = this.entities.get(entityId);
+        if (!entity || entity === this.root) return;
+
+        const newParent = newParentId ? this.entities.get(newParentId) : this.root;
+        if (!newParent) return;
+
+        // Prevent infinite loops (parenting to own descendant)
+        let check: Entity | null = newParent;
+        while (check) {
+            if (check.id === entityId) return;
+            check = check.parent;
+        }
+
+        newParent.addChild(entity); 
+
+        // 2. Babylon Reparent
+        const node = this.babylonNodes.get(entityId);
+        const parentNode = this.babylonNodes.get(newParent.id);
+
+        if (node) {
+            // Use setParent(target, true) to keep world transform
+            (node as any).setParent(parentNode || null);
+        }
+    }
+
     private removeDescendants(entity: Entity) {
         for (const child of entity.children) {
             this.removeDescendants(child);
