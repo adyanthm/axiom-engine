@@ -92,7 +92,19 @@
               <button class="text-btn" id="tool-collision" title="Toggle Collider">Add Mesh Collider</button>
               <div class="divider"></div>
               <button class="text-btn">Transform</button>
-              <button class="text-btn">View</button>
+              <div class="dropdown">
+                <button class="text-btn dropbtn" id="btn-view-menu">View ▾</button>
+                <div class="dropdown-content" id="view-dropdown-menu">
+                  <div class="dropdown-submenu">
+                    <label id="toggle-view-gizmos-lbl"><input type="checkbox" id="toggle-view-gizmos" checked> Show Gizmos <span style="margin-left:auto; font-size:10px;">▶</span></label>
+                    <div class="dropdown-submenu-content">
+                      <label><input type="checkbox" id="toggle-gizmos-cam" checked> Cameras</label>
+                      <label><input type="checkbox" id="toggle-gizmos-light" checked> Lights</label>
+                    </div>
+                  </div>
+                  <label><input type="checkbox" id="toggle-view-colliders" checked> Show Colliders</label>
+                </div>
+              </div>
             </div>
             <div class="toolbar-group right-tools" style="margin-left:auto; padding-right:8px;">
               <button class="icon-btn" id="btn-debug-layer">⠇</button> <!-- Debug layer button -->

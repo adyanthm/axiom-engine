@@ -298,6 +298,34 @@ function _process(delta) {
     // Debug layer toggle
     document.getElementById('btn-debug-layer')?.addEventListener('click', () => engine.toggleDebugLayer());
 
+    // View menu toggles
+    const toggleGizmos = document.getElementById('toggle-view-gizmos') as HTMLInputElement;
+    const toggleGizmosCam = document.getElementById('toggle-gizmos-cam') as HTMLInputElement;
+    const toggleGizmosLight = document.getElementById('toggle-gizmos-light') as HTMLInputElement;
+    const toggleColliders = document.getElementById('toggle-view-colliders') as HTMLInputElement;
+
+    toggleGizmos?.addEventListener('change', () => {
+        editorState.setShowGizmos(toggleGizmos.checked);
+        if (toggleGizmosCam) toggleGizmosCam.disabled = !toggleGizmos.checked;
+        if (toggleGizmosLight) toggleGizmosLight.disabled = !toggleGizmos.checked;
+    });
+
+    toggleGizmosCam?.addEventListener('change', () => {
+        editorState.setShowGizmos(toggleGizmosCam.checked, 'cam');
+    });
+
+    toggleGizmosLight?.addEventListener('change', () => {
+        editorState.setShowGizmos(toggleGizmosLight.checked, 'light');
+    });
+
+    toggleColliders?.addEventListener('change', () => {
+        editorState.setShowColliders(toggleColliders.checked);
+    });
+
+    editorState.onViewSettingsChanged.push(() => {
+        engine.refreshViewSettings();
+    });
+
     // --- Add Node dialog ---
     const dialog = document.getElementById('add-node-dialog')!;
     const nodeItems = dialog.querySelectorAll<HTMLElement>('.node-item');

@@ -66,13 +66,25 @@ export class EditorGizmos {
         // Apply current visibility state to newly created helpers
         const items = this.helpers.get(id);
         if (items) {
-            items.forEach(m => m.setEnabled(this.isVisible));
+            let typeEnabled = true;
+            if (entity.type === 'Camera') typeEnabled = editorState.showCameraGizmos;
+            else if (entity.type === 'Light') typeEnabled = editorState.showLightGizmos;
+
+            items.forEach(m => m.setEnabled(this.isVisible && editorState.showGizmos && typeEnabled));
         }
     }
 
     public showAll() {
         this.isVisible = true;
-        this.helpers.forEach(items => items.forEach(m => m.setEnabled(true)));
+        this.helpers.forEach((items, id) => {
+            const entity = this.sceneManager.entities.get(id);
+            let typeEnabled = true;
+            if (entity) {
+                if (entity.type === 'Camera') typeEnabled = editorState.showCameraGizmos;
+                else if (entity.type === 'Light') typeEnabled = editorState.showLightGizmos;
+            }
+            items.forEach(m => m.setEnabled(true && editorState.showGizmos && typeEnabled));
+        });
     }
 
     public hideAll() {

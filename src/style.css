@@ -1123,3 +1123,74 @@ button {
 .bit-toggle label:hover {
   border-color: #5bb1d9;
 }
+
+/* Custom View Menu Dropdown */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: var(--g-panel);
+  min-width: 140px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
+  z-index: 1000;
+  border: 1px solid var(--g-border);
+  border-radius: 4px;
+  top: 100%;
+  left: 0;
+  padding: 4px 0;
+}
+
+.dropdown:hover .dropdown-content, .dropdown:focus-within .dropdown-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-content label {
+  color: var(--g-text);
+  padding: 6px 12px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.dropdown-content label:hover {
+  background-color: var(--g-hover);
+  color: var(--g-text-light);
+}
+
+.dropdown-content input {
+  cursor: pointer;
+}
+
+
+/* Submenu Logic */
+.dropdown-submenu {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.dropdown-submenu-content {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: 0;
+  background-color: var(--g-panel);
+  min-width: 120px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
+  border: 1px solid var(--g-border);
+  border-radius: 4px;
+  padding: 4px 0;
+  z-index: 1001;
+}
+.dropdown-submenu:hover .dropdown-submenu-content {
+  display: flex;
+  flex-direction: column;
+}
+

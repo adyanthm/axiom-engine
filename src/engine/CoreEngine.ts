@@ -644,6 +644,19 @@ export class CoreEngine {
         }
     }
 
+    public refreshViewSettings() {
+        this.refreshAllColliderVisuals();
+        
+        // Also refresh editor gizmos
+        if (this.editorGizmos) {
+            if (!this.isPlaying && editorState.showGizmos) {
+                this.editorGizmos.showAll();
+            } else {
+                this.editorGizmos.hideAll();
+            }
+        }
+    }
+
     public updateColliderVisuals(entity: Entity, node: BabylonNode) {
         if (!(node instanceof Mesh) && !(node instanceof TransformNode)) return;
 
@@ -656,8 +669,8 @@ export class CoreEngine {
                 return;
             }
 
-            // Only show blue overlay in editor AND only if physics is active AND it is collidable
-            if (!this.isPlaying && entity.physicsType !== 'None' && entity.collidable) {
+            // Only show blue overlay in editor AND only if physics is active AND it is collidable AND user wants to see it
+            if (!this.isPlaying && entity.physicsType !== 'None' && entity.collidable && editorState.showColliders) {
                 m.renderOverlay = true;
                 m.overlayColor = new Color3(0.4, 0.7, 1.0); // Light Blue
                 m.overlayAlpha = 0.25; // Semi-transparent
