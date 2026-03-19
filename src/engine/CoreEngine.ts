@@ -99,7 +99,7 @@ export class CoreEngine {
 
         // Ambient hemisphere light (editor only)
         const hemi = new HemisphericLight('__editor_hemi__', new Vector3(0, 1, 0), this.babylonScene);
-        hemi.intensity = 0.6; 
+        hemi.intensity = 0.6;
         hemi.diffuse = new Color3(0.9, 0.95, 1.0);
         hemi.groundColor = new Color3(0.1, 0.1, 0.1);
 
@@ -138,17 +138,18 @@ export class CoreEngine {
         if (existing) existing.dispose();
 
         const skybox = MeshBuilder.CreateSphere('__sky__', { diameter: 1000, segments: 32 }, this.babylonScene);
+        skybox.infiniteDistance = true;
         this.skyMaterial = new SkyMaterial('__skyMat__', this.babylonScene);
         this.skyMaterial.backFaceCulling = false;
-        
-        this.skyMaterial.turbidity = 1.5; 
-        this.skyMaterial.luminance = 1.0; 
-        this.skyMaterial.inclination = 0.2; 
+
+        this.skyMaterial.turbidity = 1.5;
+        this.skyMaterial.luminance = 1.0;
+        this.skyMaterial.inclination = 0.2;
         this.skyMaterial.azimuth = 0.15;
         this.skyMaterial.mieCoefficient = 0.002;
         this.skyMaterial.mieDirectionalG = 0.85;
         this.skyMaterial.rayleigh = 2.0;
-        
+
         skybox.material = this.skyMaterial;
         skybox.isPickable = false;
         this.babylonScene.environmentIntensity = 1.0;
@@ -167,7 +168,7 @@ export class CoreEngine {
             if (!this.isPlaying) editorState.notifyTransformChanged(false);
         };
         const notifyDragEnd = () => {
-             if (!this.isPlaying) editorState.notifyTransformChanged(true);
+            if (!this.isPlaying) editorState.notifyTransformChanged(true);
         };
 
         this.gizmoManager.gizmos.positionGizmo?.onDragObservable.add(notifyDrag);
@@ -208,9 +209,9 @@ export class CoreEngine {
             if (node instanceof Mesh) this.gizmoManager.attachToMesh(node);
         }
 
-        if (mode === 'move')   this.gizmoManager.positionGizmoEnabled = true;
+        if (mode === 'move') this.gizmoManager.positionGizmoEnabled = true;
         if (mode === 'rotate') this.gizmoManager.rotationGizmoEnabled = true;
-        if (mode === 'scale' && allowScale)  this.gizmoManager.scaleGizmoEnabled = true;
+        if (mode === 'scale' && allowScale) this.gizmoManager.scaleGizmoEnabled = true;
         if (mode === 'select' && allowScale) this.gizmoManager.boundingBoxGizmoEnabled = true;
     }
 
@@ -227,19 +228,19 @@ export class CoreEngine {
 
         if (!selectedId) return;
         const entity = this.sceneManager.entities.get(selectedId);
-        const node   = this.sceneManager.babylonNodes.get(selectedId);
-        const proxy  = this.gizmoProxies.get(selectedId);
+        const node = this.sceneManager.babylonNodes.get(selectedId);
+        const proxy = this.gizmoProxies.get(selectedId);
 
         // Show outline on meshes
         if (node instanceof Mesh && !node.name.startsWith('__')) {
             node.renderOutline = true;
-            node.outlineColor  = Color3.FromHexString('#ff8800');
-            node.outlineWidth  = 0.025;
+            node.outlineColor = Color3.FromHexString('#ff8800');
+            node.outlineWidth = 0.025;
         } else if (node instanceof TransformNode && !node.name.startsWith('__')) {
             node.getChildMeshes().forEach(m => {
                 m.renderOutline = true;
-                m.outlineColor  = Color3.FromHexString('#ff8800');
-                m.outlineWidth  = 0.025;
+                m.outlineColor = Color3.FromHexString('#ff8800');
+                m.outlineWidth = 0.025;
             });
         }
 
@@ -302,13 +303,13 @@ export class CoreEngine {
         if (!gen) {
             gen = new ShadowGenerator(entity.lightShadowMapSize, light);
             (gen as any)._mapSize = entity.lightShadowMapSize;
-            
+
             // Auto-calc frustum for directional shadows
             if (light instanceof DirectionalLight) {
                 (light as any).autoUpdateExtends = true;
                 (light as any).autoCalcShadowZBounds = true;
             }
-            
+
             this.shadowGenerators.set(entity.id, gen);
 
             // Register all existing meshes as casters + receivers
@@ -328,11 +329,11 @@ export class CoreEngine {
 
         // Apply filter mode
         switch (entity.lightShadowBlur) {
-            case 'Exponential':     gen.filter = ShadowGenerator.FILTER_EXPONENTIALSHADOWMAP;     break;
+            case 'Exponential': gen.filter = ShadowGenerator.FILTER_EXPONENTIALSHADOWMAP; break;
             case 'BlurExponential': gen.filter = ShadowGenerator.FILTER_BLUREXPONENTIALSHADOWMAP; break;
-            case 'PCF':             gen.filter = ShadowGenerator.FILTER_PCF;                        break;
-            case 'PCSS':            gen.filter = ShadowGenerator.FILTER_PCSS;                       break;
-            default:                gen.filter = ShadowGenerator.FILTER_NONE;                       break;
+            case 'PCF': gen.filter = ShadowGenerator.FILTER_PCF; break;
+            case 'PCSS': gen.filter = ShadowGenerator.FILTER_PCSS; break;
+            default: gen.filter = ShadowGenerator.FILTER_NONE; break;
         }
 
         gen.setDarkness(entity.lightShadowDarkness);
@@ -370,7 +371,7 @@ export class CoreEngine {
             node.material = mat;
         }
         mat.diffuseColor = Color3.FromHexString(entity.materialColor);
-        
+
         if (entity.emissiveEnabled) {
             const ec = Color3.FromHexString(entity.materialEmissive);
             mat.emissiveColor = ec.scale(entity.emissiveIntensity);
@@ -397,7 +398,7 @@ export class CoreEngine {
             const hor = Color3.FromHexString(entity.skyHorizonColor).scale(entity.skyEnergy);
             gMat.topColor = top;
             gMat.bottomColor = hor;
-            gMat.offset = (entity.skyCurve * 2.0) - 1.0; 
+            gMat.offset = (entity.skyCurve * 2.0) - 1.0;
             gMat.smoothness = 1.0;
         } else {
             if (!(skybox.material instanceof SkyMaterial)) {
@@ -445,7 +446,7 @@ export class CoreEngine {
         // Handle Global Ground Physics
         const groundBodyName = '__global_physics_ground__';
         let groundNode = this.babylonScene.getMeshByName(groundBodyName);
-        
+
         if (entity.groundLevelEnabled && entity.groundLevelCollidable) {
             if (!groundNode) {
                 // Extremely large static box for collision
@@ -454,7 +455,7 @@ export class CoreEngine {
                 groundNode.isPickable = false;
             }
             groundNode.position.y = entity.groundLevel - 0.5; // Surface at groundLevel
-            
+
             if (!(groundNode as any).physicsBody && this.babylonScene.isPhysicsEnabled()) {
                 const aggregate = new PhysicsAggregate(groundNode, PhysicsShapeType.BOX, { mass: 0, friction: 0.5, restitution: 0.1 }, this.babylonScene);
                 (groundNode as any).physicsBody = aggregate.body;
@@ -472,12 +473,12 @@ export class CoreEngine {
 
         if (this.isPlaying) {
             const editorCam = this.babylonScene.getCameraByName('editorCamera') as ArcRotateCamera;
-            
+
             if (entity.debugCamera) {
                 // Switch to the orbit/debug camera
                 this.babylonScene.activeCamera = editorCam;
                 editorCam.attachControl(this.babylonEngine.getRenderingCanvas(), true);
-                
+
                 // Copy game camera current view as a starting point
                 editorCam.setPosition(bCam.position.clone());
                 const forward = bCam.getDirection(Vector3.Forward());
@@ -564,18 +565,18 @@ export class CoreEngine {
                 const dl = new DirectionalLight(entity.name,
                     new Vector3(dir.x, dir.y, dir.z).normalize(), this.babylonScene);
                 dl.intensity = 1.5;
-                dl.diffuse   = new Color3(1, 0.95, 0.85);
-                dl.position  = new Vector3(0, 10, 0); // Temporary, fixed in proxy init
-                actualLight  = dl;
+                dl.diffuse = new Color3(1, 0.95, 0.85);
+                dl.position = new Vector3(0, 10, 0); // Temporary, fixed in proxy init
+                actualLight = dl;
             } else if (entity.lightType === 'Point') {
                 const pl = new PointLight(entity.name, Vector3.Zero(), this.babylonScene);
                 pl.intensity = 1.0; pl.range = 20;
-                actualLight  = pl;
+                actualLight = pl;
             } else if (entity.lightType === 'Spot') {
                 const sl = new SpotLight(entity.name, Vector3.Zero(),
                     new Vector3(0, -1, 0), Math.PI / 4, 2, this.babylonScene);
                 sl.intensity = 1.5;
-                actualLight  = sl;
+                actualLight = sl;
             } else {
                 actualLight = new HemisphericLight(entity.name, Vector3.Up(), this.babylonScene);
             }
@@ -599,7 +600,7 @@ export class CoreEngine {
                         proxy.getWorldMatrix()
                     ).normalize();
                     actualLight.direction = fwd;
-                    actualLight.position  = proxy.getAbsolutePosition().clone();
+                    actualLight.position = proxy.getAbsolutePosition().clone();
 
                     // Keep entity lightDirection in sync so Inspector shows correct values
                     entity.lightDirection = { x: fwd.x, y: fwd.y, z: fwd.z };
@@ -616,7 +617,7 @@ export class CoreEngine {
 
         node!.name = entity.name;
         node!.setEnabled(entity.visible);
-        
+
         // Sync parent in Babylon
         if (entity.parent) {
             const babylonParent = this.sceneManager.babylonNodes.get(entity.parent.id);
@@ -629,7 +630,7 @@ export class CoreEngine {
 
         // Sync editor gizmo helpers for this entity
         setTimeout(() => this.editorGizmos?.syncEntity(entity.id, entity), 0);
-        
+
         if (this.isPlaying) {
             this.applyPhysicsToEntity(entity);
         }
@@ -646,7 +647,7 @@ export class CoreEngine {
 
     public refreshViewSettings() {
         this.refreshAllColliderVisuals();
-        
+
         // Also refresh editor gizmos
         if (this.editorGizmos) {
             if (!this.isPlaying && editorState.showGizmos) {
@@ -661,7 +662,7 @@ export class CoreEngine {
         if (!(node instanceof Mesh) && !(node instanceof TransformNode)) return;
 
         const meshes = (node instanceof Mesh) ? [node] : node.getChildMeshes();
-        
+
         meshes.forEach(m => {
             if (m.name.startsWith('__physics_collider__')) {
                 m.renderOverlay = false;
@@ -689,7 +690,7 @@ export class CoreEngine {
 
             const base64 = asset.data as string;
             const result = await SceneLoader.ImportMeshAsync("", "", base64, this.babylonScene);
-            
+
             result.meshes.forEach(m => {
                 // Only parent top-level nodes from the imported file to avoid flattening hierarchy
                 if (!m.parent) {
@@ -700,13 +701,13 @@ export class CoreEngine {
                         m.rotation = Vector3.Zero();
                     }
                 }
-                
+
                 if (this.shadowGenerator) this.shadowGenerator.addShadowCaster(m, true);
                 for (const gen of this.shadowGenerators.values()) gen.addShadowCaster(m, true);
                 m.receiveShadows = entity.receiveShadows;
             });
             console.log(`Successfully loaded model asset: ${asset.name}`);
-            
+
             // Re-apply physics now that the actual geometry is loaded
             if (entity.hasCollider) {
                 this.applyPhysicsToEntity(entity);
@@ -788,15 +789,15 @@ export class CoreEngine {
         this.isPlaying = true;
         this.refreshAllColliderVisuals();
         this.editorGizmos?.hideAll();
-        
+
         // Respect Sky showGrid setting
         const skyEntity = Array.from(this.sceneManager.entities.values()).find(e => e.type === 'Sky');
         if (skyEntity) {
             this.babylonScene.getMeshByName('__grid__')?.setEnabled(skyEntity.showGrid);
         }
-        
+
         editorState.clearSelection();
-        
+
         // Apply physics to all entities
         for (const entity of this.sceneManager.entities.values()) {
             this.applyPhysicsToEntity(entity);
@@ -808,11 +809,11 @@ export class CoreEngine {
             if (bCam) {
                 const editorCam = this.babylonScene.getCameraByName('editorCamera') as ArcRotateCamera;
                 editorCam?.detachControl();
-                
+
                 if (mainCamEntity.debugCamera) {
                     this.babylonScene.activeCamera = editorCam;
                     editorCam.attachControl(this.babylonEngine.getRenderingCanvas(), true);
-                    
+
                     // Initial sync of the debug view to the game camera
                     editorCam.setPosition(bCam.position.clone());
                     const forward = bCam.getDirection(Vector3.Forward());
@@ -880,7 +881,7 @@ export class CoreEngine {
             else if (entity.meshType === 'Plane') {
                 shapeType = PhysicsShapeType.BOX;
                 // Force a thickness for planes so objects don't tunnel through
-                extents = new Vector3(5, 0.1, 5); 
+                extents = new Vector3(5, 0.1, 5);
             }
             else if (entity.meshType === 'ImportedModel') {
                 const childMeshes = node.getChildMeshes();
@@ -912,7 +913,7 @@ export class CoreEngine {
                             mergedMesh.setParent(node);
                             mergedMesh.isVisible = false;
                             mergedMesh.isPickable = false;
-                            
+
                             shapeType = PhysicsShapeType.MESH;
                             // We will assign this to props.mesh later
                         }
@@ -949,7 +950,7 @@ export class CoreEngine {
                 restitution: entity.restitution
             };
             if (extents) props.extents = extents;
-            
+
             const physicsTarget = (entity.meshType === 'ImportedModel' && mergedMesh) ? mergedMesh : node;
 
             const aggregate = new PhysicsAggregate(physicsTarget, shapeType, props, this.babylonScene);
@@ -957,7 +958,7 @@ export class CoreEngine {
             aggregate.body.setMotionType(motionType);
             aggregate.body.setLinearDamping(entity.linearDamping);
             aggregate.body.setAngularDamping(entity.angularDamping);
-            
+
             // Lock Rotation
             if (entity.lockRotationX || entity.lockRotationY || entity.lockRotationZ) {
                 const massProps = aggregate.body.getMassProperties();
@@ -975,7 +976,7 @@ export class CoreEngine {
                 aggregate.shape.filterMembershipMask = 0;
                 aggregate.shape.filterCollideMask = 0;
             }
-            
+
             (node as any).physicsBody = aggregate.body;
         } catch (e) {
             console.error(`Failed to apply physics to ${entity.name}:`, e);
