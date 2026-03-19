@@ -1,5 +1,5 @@
 import './style.css';
-import { createIcons, Play, Pause, Square, Plus, Link, Search, FolderPlus, FilePlus, Upload, ChevronLeft, ChevronRight, Settings, X, Gamepad2, Boxes } from 'lucide';
+import { createIcons, Play, Pause, Square, Plus, Link, Search, FolderPlus, FilePlus, Upload, ChevronLeft, ChevronRight, Settings, X, Gamepad2, Boxes, Box, Circle, Cylinder, CircleDashed, Pill, Triangle, Disc, Sun, Lightbulb, Flashlight, Globe, Camera, Crosshair } from 'lucide';
 import { CoreEngine } from './engine/CoreEngine';
 import { HierarchyPanel } from './editor/HierarchyPanel';
 import { InspectorPanel } from './editor/InspectorPanel';
@@ -375,6 +375,8 @@ function _process(delta) {
     const openDialog = () => {
         dialog.classList.remove('hidden');
         (dialog.querySelector('.search-node-input') as HTMLInputElement)?.focus();
+        // Icons in hidden dialogs don't render during page load, so re-run Lucide here
+        createIcons({ icons: { Box, Circle, Cylinder, CircleDashed, Pill, Triangle, Disc, Sun, Lightbulb, Flashlight, Globe, Camera, Crosshair, X } });
     };
     const closeDialog = () => dialog.classList.add('hidden');
 
@@ -529,7 +531,7 @@ function _process(delta) {
 
     // Initialize all HTML-embedded Lucide icons
     createIcons({
-        icons: { Play, Pause, Square, Plus, Link, Search, FolderPlus, FilePlus, Upload, ChevronLeft, ChevronRight, Settings, X, Gamepad2, Boxes }
+        icons: { Play, Pause, Square, Plus, Link, Search, FolderPlus, FilePlus, Upload, ChevronLeft, ChevronRight, Settings, X, Gamepad2, Boxes, Box, Circle, Cylinder, CircleDashed, Pill, Triangle, Disc, Sun, Lightbulb, Flashlight, Globe, Camera, Crosshair }
     });
 
     // --- Final Security: Save on refresh/close ---
