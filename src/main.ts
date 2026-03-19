@@ -322,6 +322,36 @@ function _process(delta) {
         editorState.setShowColliders(toggleColliders.checked);
     });
 
+    // Sync initial collider state (off by default)
+    editorState.setShowColliders(false);
+
+    // Viewport settings panel sliders
+    const zoomSlider = document.getElementById('zoom-speed-slider') as HTMLInputElement;
+    const panSlider = document.getElementById('pan-speed-slider') as HTMLInputElement;
+    const zoomVal = document.getElementById('zoom-speed-val');
+    const panVal = document.getElementById('pan-speed-val');
+
+    zoomSlider?.addEventListener('input', () => {
+        const v = parseFloat(zoomSlider.value);
+        engine._zoomSensitivity = v;
+        if (zoomVal) zoomVal.textContent = `${v.toFixed(1)}×`;
+    });
+
+    panSlider?.addEventListener('input', () => {
+        const v = parseFloat(panSlider.value);
+        engine._panSensitivity = v;
+        if (panVal) panVal.textContent = `${v.toFixed(1)}×`;
+    });
+
+    document.getElementById('btn-reset-nav')?.addEventListener('click', () => {
+        engine._zoomSensitivity = 1.0;
+        engine._panSensitivity = 1.0;
+        if (zoomSlider) zoomSlider.value = '1';
+        if (panSlider) panSlider.value = '1';
+        if (zoomVal) zoomVal.textContent = '1.0×';
+        if (panVal) panVal.textContent = '1.0×';
+    });
+
     editorState.onViewSettingsChanged.push(() => {
         engine.refreshViewSettings();
     });

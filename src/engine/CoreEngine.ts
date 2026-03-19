@@ -42,6 +42,10 @@ export class CoreEngine {
     /** Actual Babylon light objects, keyed by entity ID */
     private lightActuals: Map<string, DirectionalLight | PointLight | SpotLight | HemisphericLight> = new Map();
 
+    /** User-adjustable sensitivity multipliers for viewport navigation */
+    public _zoomSensitivity: number = 1.0;
+    public _panSensitivity: number = 1.0;
+
     public getLightActual(id: string) {
         return this.lightActuals.get(id);
     }
@@ -93,6 +97,23 @@ export class CoreEngine {
         camera.minZ = 0.1;
         camera.lowerRadiusLimit = 1;
 
+        // Maintain clip distance, zoom/pan sensitivity dynamically in real time
+        this.babylonScene.onBeforeRenderObservable.add(() => {
+            if (!this.isPlaying) {
+                // 1. Ensure maxZ is huge enough to hold giant architectures
+                camera.maxZ = Math.max(200000, camera.radius * 4);
+
+                // 2. Dynamically shift the near-clip plane to prevent depth-buffer Z-fighting artifacts
+                camera.minZ = Math.max(0.1, camera.maxZ / 100000);
+
+                // 3. Scale scroll (zoom) speed relative to distance from subject
+                camera.wheelPrecision = Math.max(0.01, 500 / Math.max(1, camera.radius)) * (this._zoomSensitivity ?? 1);
+
+                // 4. Scale panning speed relative to distance from subject (high sensibility = slow pan)
+                camera.panningSensibility = Math.max(1, 1200 / Math.max(1, camera.radius)) / (this._panSensitivity ?? 1);
+            }
+        });
+
         // Tone mapping
         this.babylonScene.imageProcessingConfiguration.toneMappingEnabled = true;
         this.babylonScene.imageProcessingConfiguration.toneMappingType = 1; // ACES
@@ -137,7 +158,7 @@ export class CoreEngine {
         const existing = this.babylonScene.getMeshByName('__sky__');
         if (existing) existing.dispose();
 
-        const skybox = MeshBuilder.CreateSphere('__sky__', { diameter: 1000, segments: 32 }, this.babylonScene);
+        const skybox = MeshBuilder.CreateSphere('__sky__', { diameter: 100000, segments: 32 }, this.babylonScene);
         skybox.infiniteDistance = true;
         this.skyMaterial = new SkyMaterial('__skyMat__', this.babylonScene);
         this.skyMaterial.backFaceCulling = false;
@@ -611,6 +632,7 @@ export class CoreEngine {
             node = proxy;   // store proxy so gizmos, picking, etc. all work
         } else if (entity.type === 'Camera') {
             node = new UniversalCamera(entity.name, Vector3.Zero(), this.babylonScene);
+            (node as UniversalCamera).maxZ = 100000;
         } else {
             node = new TransformNode(entity.name, this.babylonScene);
         }

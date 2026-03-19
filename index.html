@@ -1,11 +1,13 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Axiom Engine (Godot Style)</title>
 </head>
+
 <body>
   <div id="godot-layout">
     <!-- Top Bar -->
@@ -66,10 +68,10 @@
             </div>
           </div>
           <div class="path-bar">
-             <span class="path-label">res://</span>
+            <span class="path-label">res://</span>
           </div>
           <div id="filesystem-tree" class="tree-view">
-             <!-- Assets rendered here -->
+            <!-- Assets rendered here -->
           </div>
           <input type="file" id="asset-upload-input" style="display:none" multiple>
         </div>
@@ -96,18 +98,44 @@
                 <button class="text-btn dropbtn" id="btn-view-menu">View ▾</button>
                 <div class="dropdown-content" id="view-dropdown-menu">
                   <div class="dropdown-submenu">
-                    <label id="toggle-view-gizmos-lbl"><input type="checkbox" id="toggle-view-gizmos" checked> Show Gizmos <span style="margin-left:auto; font-size:10px;">▶</span></label>
+                    <label id="toggle-view-gizmos-lbl"><input type="checkbox" id="toggle-view-gizmos" checked> Show
+                      Gizmos <span style="margin-left:auto; font-size:10px;">▶</span></label>
                     <div class="dropdown-submenu-content">
                       <label><input type="checkbox" id="toggle-gizmos-cam" checked> Cameras</label>
                       <label><input type="checkbox" id="toggle-gizmos-light" checked> Lights</label>
                     </div>
                   </div>
-                  <label><input type="checkbox" id="toggle-view-colliders" checked> Show Colliders</label>
+                  <label><input type="checkbox" id="toggle-view-colliders"> Show Colliders</label>
                 </div>
               </div>
             </div>
             <div class="toolbar-group right-tools" style="margin-left:auto; padding-right:8px;">
-              <button class="icon-btn" id="btn-debug-layer">⠇</button> <!-- Debug layer button -->
+              <button class="icon-btn" id="btn-debug-layer" title="Toggle Debug Layer">⠇</button>
+              <div class="dropdown" id="viewport-settings-dropdown">
+                <button class="icon-btn dropbtn" id="btn-viewport-settings" title="Viewport Settings">⋯</button>
+                <div class="dropdown-content" id="viewport-settings-panel" style="min-width:200px; right:0; left:auto;">
+                  <div
+                    style="padding:6px 12px; font-size:11px; font-weight:600; color:var(--g-text-dim); border-bottom:1px solid var(--g-border); margin-bottom:4px;">
+                    Viewport Settings</div>
+                  <div style="padding:4px 12px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:2px;">
+                      <label style="font-size:12px;">Zoom Speed</label><span id="zoom-speed-val"
+                        style="font-size:11px; color:var(--g-text-dim);">1.0×</span></div>
+                    <input type="range" id="zoom-speed-slider" min="0.1" max="5" step="0.1" value="1"
+                      style="width:100%; margin-bottom:8px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:2px;">
+                      <label style="font-size:12px;">Pan Speed</label><span id="pan-speed-val"
+                        style="font-size:11px; color:var(--g-text-dim);">1.0×</span></div>
+                    <input type="range" id="pan-speed-slider" min="0.1" max="5" step="0.1" value="1"
+                      style="width:100%;">
+                  </div>
+                  <div style="padding:4px 12px 8px; border-top:1px solid var(--g-border); margin-top:4px;">
+                    <button id="btn-reset-nav"
+                      style="all:unset; cursor:pointer; font-size:11px; color:var(--g-accent); padding:2px 0;">↺ Reset
+                      to Auto</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <div class="viewport-wrapper">
@@ -117,7 +145,7 @@
         </div>
 
         <div id="script-panel" class="panel flex-grow hidden">
-           <!-- CodeMirror 6 will live here -->
+          <!-- CodeMirror 6 will live here -->
         </div>
       </main>
       <div class="resizer" id="resizer-right"></div>
@@ -139,7 +167,7 @@
             <button class="icon-btn" title="Object settings">⚙</button>
           </div>
           <div id="inspector-content" class="property-view">
-             <!-- properties auto generated -->
+            <!-- properties auto generated -->
           </div>
         </div>
       </aside>
@@ -178,4 +206,5 @@
 
   <script type="module" src="/src/main.ts"></script>
 </body>
+
 </html>
