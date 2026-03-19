@@ -1,4 +1,5 @@
 import './style.css';
+import { createIcons, Play, Pause, Square, Plus, Link, Search, FolderPlus, FilePlus, Upload, ChevronLeft, ChevronRight, Settings, X, Gamepad2, Boxes } from 'lucide';
 import { CoreEngine } from './engine/CoreEngine';
 import { HierarchyPanel } from './editor/HierarchyPanel';
 import { InspectorPanel } from './editor/InspectorPanel';
@@ -470,13 +471,66 @@ function _process(delta) {
             overlay.className = 'resizer-overlay';
             document.body.appendChild(overlay);
 
-            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', onMouseUp);
         });
     };
 
     setupResizer('resizer-left', 'left-sidebar', true);
     setupResizer('resizer-right', 'right-sidebar', false);
+
+    const setupVerticalResizer = (resizerId: string, topId: string, bottomId: string) => {
+        const resizer = document.getElementById(resizerId);
+        const top = document.getElementById(topId);
+        const bottom = document.getElementById(bottomId);
+        if (!resizer || !top || !bottom) return;
+
+        let startY: number;
+        let startTopHeight: number;
+        let startBottomHeight: number;
+
+        const onMouseMove = (e: MouseEvent) => {
+            const dy = e.clientY - startY;
+            const newTopHeight = startTopHeight + dy;
+            const newBottomHeight = startBottomHeight - dy;
+
+            if (newTopHeight > 100 && newBottomHeight > 100) {
+                top.style.flex = 'none';
+                bottom.style.flex = 'none';
+                top.style.height = `${newTopHeight}px`;
+                bottom.style.height = `${newBottomHeight}px`;
+            }
+        };
+
+        const onMouseUp = () => {
+            resizer.classList.remove('active');
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            document.querySelectorAll('.resizer-overlay').forEach(el => el.remove());
+        };
+
+        resizer.addEventListener('mousedown', (e) => {
+            startY = e.clientY;
+            startTopHeight = top.getBoundingClientRect().height;
+            startBottomHeight = bottom.getBoundingClientRect().height;
+            resizer.classList.add('active');
+
+            const overlay = document.createElement('div');
+            overlay.className = 'resizer-overlay';
+            overlay.style.cursor = 'row-resize';
+            document.body.appendChild(overlay);
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+    };
+
+    setupVerticalResizer('resizer-left-v', 'scene-panel', 'filesystem-panel');
+
+    // Initialize all HTML-embedded Lucide icons
+    createIcons({
+        icons: { Play, Pause, Square, Plus, Link, Search, FolderPlus, FilePlus, Upload, ChevronLeft, ChevronRight, Settings, X, Gamepad2, Boxes }
+    });
 
     // --- Final Security: Save on refresh/close ---
     window.addEventListener('beforeunload', () => {

@@ -33,6 +33,7 @@ export class CoreEngine {
     private gizmoManager!: GizmoManager;
     private editorGizmos!: EditorGizmos;
     private debugLayerVisible = false;
+    private debugPopup: Window | null = null;
     private physicsViewer: PhysicsViewer | null = null;
     private static _havokInstance: any = null;
     /** Per-entity shadow generators (DirectionalLight only) */
@@ -364,6 +365,11 @@ export class CoreEngine {
     public toggleDebugLayer() {
         if (this.debugLayerVisible) {
             this.babylonScene.debugLayer.hide();
+            if (this.debugPopup && !this.debugPopup.closed) {
+                this.debugPopup.close();
+            }
+            this.debugPopup = null;
+            
             // Hide physics debug
             for (const mesh of this.babylonScene.meshes) {
                 if (mesh.parent instanceof BabylonNode && (mesh.parent as any).physicsBody) {
@@ -371,7 +377,26 @@ export class CoreEngine {
                 }
             }
         } else {
-            this.babylonScene.debugLayer.show({ embedMode: true });
+            this.debugPopup = window.open('', '_blank', 'width=1000,height=800');
+            if (this.debugPopup) {
+                this.debugPopup.document.write('<!DOCTYPE html><html><head><title>Axiom Inspector</title></head><body style="margin:0; padding:0; overflow:hidden;"></body></html>');
+                this.debugPopup.document.close();
+                
+                this.babylonScene.debugLayer.show({ 
+                    embedMode: true,
+                    globalRoot: this.debugPopup.document.body,
+                    handleResize: true
+                });
+
+                this.debugPopup.addEventListener('beforeunload', () => {
+                    this.babylonScene.debugLayer.hide();
+                    this.debugLayerVisible = false;
+                    this.debugPopup = null;
+                });
+            } else {
+                // Fallback to embedded if popups are blocked by the browser
+                this.babylonScene.debugLayer.show({ embedMode: true });
+            }
             // Show physics debug
             for (const mesh of this.babylonScene.meshes) {
                 if ((mesh as any).physicsBody) {

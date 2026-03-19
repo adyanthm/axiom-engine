@@ -28,47 +28,46 @@
         <div id="tab-assetlib" class="workspace-tab">AssetLib</div>
       </div>
       <div class="top-controls">
-        <button class="icon-btn play-btn" title="Play">▶</button>
-        <button class="icon-btn" title="Pause">⏸</button>
-        <button class="icon-btn" title="Stop">⏹</button>
+        <button class="icon-btn play-btn" title="Play"><i data-lucide="play" style="width:16px;height:16px;fill:currentColor;"></i></button>
+        <button class="icon-btn" title="Pause"><i data-lucide="pause" style="width:16px;height:16px;fill:currentColor;"></i></button>
+        <button class="icon-btn" title="Stop"><i data-lucide="square" style="width:14px;height:14px;fill:currentColor;"></i></button>
       </div>
     </header>
 
     <div id="main-content">
-      <!-- Left Sidebar -->
       <aside id="left-sidebar" class="sidebar">
         <!-- Scene Panel -->
-        <div class="panel flex-half">
-          <div class="tabs">
-            <div class="tab active">Scene</div>
-            <div class="tab">Import</div>
+        <div class="panel" id="scene-panel" style="flex:1; min-height:100px;">
+          <div class="explorer-header" style="display:flex; align-items:center; gap:8px; padding: 12px 14px; font-weight: 600; font-size: 13px; color: #e8eaed; border-bottom: 1px solid #3c4043;">
+            <i data-lucide="boxes" style="width:16px; height:16px; color:#9aa0a6;"></i> 
+            <span>Scene Explorer</span>
           </div>
-          <div class="toolbar panel-toolbar">
-            <button id="btn-add-node" class="icon-btn" title="Add Node" style="color:#dcdcdc">➕</button>
-            <button class="icon-btn">🔗</button>
+          <div class="toolbar panel-toolbar" style="padding: 6px 14px; border-bottom: 1px solid #3c4043; height: auto;">
+            <button id="btn-add-node" class="icon-btn" title="Add Node" style="color:#dcdcdc"><i data-lucide="plus" style="width:16px;height:16px;"></i></button>
+            <button class="icon-btn"><i data-lucide="link" style="width:16px;height:16px;"></i></button>
             <div class="spacer"></div>
-            <div class="filter-box">
-              <span class="filter-icon">🔍</span>
-              <input type="text" placeholder="Filter nodes" class="filter-input" style="width:100px" />
+            <div class="filter-box" style="margin-right:0;">
+              <span class="filter-icon"><i data-lucide="search" style="width:14px;height:14px;"></i></span>
+              <input type="text" id="scene-filter-input" placeholder="Filter..." class="filter-input" style="width:100px" />
             </div>
           </div>
           <div id="scene-tree" class="tree-view"></div>
         </div>
+
+        <div class="v-resizer" id="resizer-left-v"></div>
+
         <!-- FileSystem Panel -->
-        <div class="panel flex-half bottom-panel-sidebar">
+        <div class="panel bottom-panel-sidebar" id="filesystem-panel" style="flex:1; min-height:100px;">
           <div class="tabs">
             <div class="tab active">FileSystem</div>
           </div>
           <div class="toolbar panel-toolbar">
-            <button id="btn-upload-asset" class="icon-btn" title="Add Asset">➕</button>
+            <button id="btn-upload-asset" class="icon-btn" title="Add Asset"><i data-lucide="folder-plus" style="width:16px;height:16px;"></i></button>
             <div class="spacer"></div>
             <div class="filter-box" style="width: 120px;">
-              <span class="filter-icon">🔍</span>
+              <span class="filter-icon"><i data-lucide="search" style="width:14px;height:14px;"></i></span>
               <input type="text" placeholder="Filter..." class="filter-input" id="fs-filter" />
             </div>
-          </div>
-          <div class="path-bar">
-            <span class="path-label">res://</span>
           </div>
           <div id="filesystem-tree" class="tree-view">
             <!-- Assets rendered here -->
@@ -161,10 +160,10 @@
           </div>
           <div class="toolbar panel-toolbar justify-between">
             <div class="history-nav">
-              <button class="icon-btn">&lt;</button>
-              <button class="icon-btn">&gt;</button>
+              <button class="icon-btn"><i data-lucide="chevron-left" style="width:16px;height:16px;"></i></button>
+              <button class="icon-btn"><i data-lucide="chevron-right" style="width:16px;height:16px;"></i></button>
             </div>
-            <button class="icon-btn" title="Object settings">⚙</button>
+            <button class="icon-btn" title="Object settings"><i data-lucide="settings" style="width:16px;height:16px;"></i></button>
           </div>
           <div id="inspector-content" class="property-view">
             <!-- properties auto generated -->
@@ -177,7 +176,7 @@
   <!-- Add Node Dialog -->
   <div id="add-node-dialog" class="dialog-overlay hidden">
     <div class="dialog">
-      <div class="dialog-header">Create New Node <button id="btn-close-dialog" class="close-btn">×</button></div>
+      <div class="dialog-header">Create New Node <button id="btn-close-dialog" class="close-btn"><i data-lucide="x" style="width:16px;height:16px;"></i></button></div>
       <div class="dialog-content">
         <input type="text" class="filter-input search-node-input" placeholder="Search..." />
         <div class="node-list">

@@ -6,6 +6,7 @@ import { SceneManager } from '../engine/SceneManager';
 import { CoreEngine } from '../engine/CoreEngine';
 import { editorState } from './EditorState';
 import { Entity } from '../engine/Entity';
+import { createIcons, Box, Lightbulb, Camera, Square, Sun, Gamepad2 } from 'lucide';
 
 export class InspectorPanel {
     private container: HTMLElement;
@@ -55,7 +56,7 @@ export class InspectorPanel {
         // ─── Godot Node Header ──────────────────────────────────────────
         parts.push(`
         <div class="insp-node-header">
-            <span class="insp-node-icon">${this.iconFor(entity.type)}</span>
+            <span class="insp-node-icon"><i data-lucide="${this.iconFor(entity.type)}" style="width:16px;height:16px;"></i></span>
             <span class="insp-node-type">${this.labelFor(entity)} (${entity.meshType || entity.lightType || ''})</span>
         </div>`);
 
@@ -378,6 +379,9 @@ export class InspectorPanel {
 
         this.container.innerHTML = parts.join('');
 
+        // Initialize Lucide icons
+        createIcons({ icons: { Box, Lightbulb, Camera, Square, Sun, Gamepad2 } });
+
         // ═══ Event Bindings ═══════════════════════════════════════════════
         this.bindBaseEvents(entity, bNode, tBindNode);
     }
@@ -386,7 +390,7 @@ export class InspectorPanel {
         const parts: string[] = [];
         parts.push(`
         <div class="insp-node-header">
-            <span class="insp-node-icon">🌤</span>
+            <span class="insp-node-icon"><i data-lucide="sun" style="width:16px;height:16px;"></i></span>
             <span class="insp-node-type">WorldEnvironment</span>
         </div>
         <div class="insp-section-header">
@@ -509,8 +513,6 @@ export class InspectorPanel {
                     <input class="insp-text-input" id="ground-y" type="number" step="0.1" value="${entity.groundLevel.toFixed(2)}">
                 </div>
             </div>
-                </div>
-            </div>
             <div class="insp-row">
                 <div class="insp-label">Show Grid</div>
                 <div class="insp-field">
@@ -520,9 +522,9 @@ export class InspectorPanel {
                     </label>
                 </div>
             </div>
-        </div>`);
-
+        </div>`); // Closing the insp-section for ground level
         this.container.innerHTML = parts.join('');
+        createIcons({ icons: { Sun } });
 
         // --- Bind Events ---
         const toggle = this.container.querySelector<HTMLInputElement>('#custom-sky-enabled');
@@ -631,10 +633,11 @@ export class InspectorPanel {
     private renderEmptyState() {
         this.container.innerHTML = `
         <div class="empty-state">
-            <div class="empty-icon">🎮</div>
+            <div class="empty-icon"><i data-lucide="gamepad-2" style="width:48px;height:48px;opacity:0.2;"></i></div>
             <h3>Scene Inspector</h3>
             <p>Select a node to edit its properties.</p>
         </div>`;
+        createIcons({ icons: { Gamepad2 } });
     }
 
     private bindBaseEvents(entity: Entity, bNode: any, tBindNode: any) {
@@ -1007,8 +1010,8 @@ export class InspectorPanel {
     }
 
     private iconFor(t: string): string {
-        const m: any = { Mesh: '📦', Light: '💡', Camera: '🎥', Node: '⬜', Sky: '🌤' };
-        return m[t] || '⬜';
+        const m: any = { Mesh: 'box', Light: 'lightbulb', Camera: 'camera', Node: 'square', Sky: 'sun' };
+        return m[t] || 'square';
     }
 
     private labelFor(e: any): string {
