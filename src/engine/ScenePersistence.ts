@@ -98,12 +98,12 @@ interface SerializedEntity {
     lightDirection?: { x: number, y: number, z: number };
 }
 
-interface SerializedScene {
+export interface SerializedScene {
     entities: SerializedEntity[];
     selectedEntityId: string | null;
 }
 
-export async function saveScene(engine: CoreEngine): Promise<void> {
+export function getSerializedSceneData(engine: CoreEngine): SerializedScene {
     const sm = engine.sceneManager;
     const serialized: SerializedEntity[] = [];
 
@@ -196,10 +196,15 @@ export async function saveScene(engine: CoreEngine): Promise<void> {
         for (const child of entity.children) queue.push(child);
     }
 
-    const data: SerializedScene = {
+    return {
         entities: serialized,
         selectedEntityId: null,
     };
+}
+
+
+export async function saveScene(engine: CoreEngine): Promise<void> {
+    const data = getSerializedSceneData(engine);
 
     try {
         const db = await getDB();
@@ -209,7 +214,7 @@ export async function saveScene(engine: CoreEngine): Promise<void> {
             tx.oncomplete = () => res();
             tx.onerror = () => rej(tx.error);
         });
-        console.log(`[ScenePersistence] Saved ${serialized.length} entities to IndexedDB`);
+        console.log(`[ScenePersistence] Saved ${data.entities.length} entities to IndexedDB`);
     } catch (e) {
         console.warn('Failed to save scene:', e);
     }

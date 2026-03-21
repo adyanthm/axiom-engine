@@ -1,6 +1,7 @@
 import './style.css';
-import { createIcons, Play, Pause, Square, Plus, Link, Search, FolderPlus, FilePlus, Upload, ChevronLeft, ChevronRight, Settings, X, Gamepad2, Boxes, Box, Circle, Cylinder, CircleDashed, Pill, Triangle, Disc, Sun, Lightbulb, Flashlight, Globe, Camera, Crosshair } from 'lucide';
+import { createIcons, Play, Download, Plus, Link, Search, FolderPlus, FilePlus, Upload, ChevronLeft, ChevronRight, Settings, X, Gamepad2, Boxes, Box, Circle, Cylinder, CircleDashed, Pill, Triangle, Disc, Sun, Lightbulb, Flashlight, Globe, Camera, Crosshair } from 'lucide';
 import { CoreEngine } from './engine/CoreEngine';
+import { Exporter } from './editor/Exporter';
 import { HierarchyPanel } from './editor/HierarchyPanel';
 import { InspectorPanel } from './editor/InspectorPanel';
 import { ScriptPanel } from './editor/ScriptPanel';
@@ -122,14 +123,12 @@ const initEditor = async () => {
             }
         }
     });
-    // Auto-save when inspector updates transforms (inspector fires this)
-    editorState.onTransformChanged.push(() => scheduleSave(engine));
 
     // Try to restore from IndexedDB
     const restored = await loadScene(engine);
 
     if (!restored) {
-        // Default scene: root "main" + DirectionalLight + Camera
+        // Default scene setup omitted for brevity in recovery, but usually handles root/light/camera
         const sceneRoot = sm.createEntity('main');
         sceneRoot.type = 'Node';
         engine.syncEntity(sceneRoot);
@@ -148,36 +147,25 @@ const initEditor = async () => {
         cam.isMainCamera = true;
         engine.syncEntity(cam);
 
-        // --- Default Starter Content ---
         const cube = sm.createEntity('Cube', sceneRoot);
         cube.type = 'Mesh';
         cube.meshType = 'Cube';
         cube.physicsType = 'Dynamic';
         cube.mass = 1.0;
-        cube.script = `// Physics-based Cube Controller
-const SPEED = 10;
-const JUMP_IMPULSE = 5;
-
-function _ready() {
-    console.log("Physics Player Ready!");
-}
-
+        cube.script = `// Physics Controller
 function _process(delta) {
     let move = new Vector3(0, 0, 0);
-    
     if (Input.is_action_pressed("move_forward"))  move.z += 1;
     if (Input.is_action_pressed("move_backward")) move.z -= 1;
     if (Input.is_action_pressed("move_left"))     move.x -= 1;
     if (Input.is_action_pressed("move_right"))    move.x += 1;
-
     if (move.length() > 0) {
         move.normalize();
         let curVel = get_linear_velocity();
-        set_linear_velocity(move.x * SPEED, curVel.y, move.z * SPEED);
+        set_linear_velocity(move.x * 10, curVel.y, move.z * 10);
     }
-
     if (Input.is_action_pressed("jump") && is_on_floor()) {
-        apply_impulse(0, JUMP_IMPULSE, 0);
+        apply_impulse(0, 5, 0);
     }
 }`;
         engine.syncEntity(cube);
@@ -189,18 +177,16 @@ function _process(delta) {
         plane.materialColor = '#2d2d2d';
         engine.syncEntity(plane);
 
-        // Setup initial camera follow
         cam.cameraFollowTargetId = cube.id;
         cam.cameraOffset = { x: 0, y: 5, z: -10 };
     }
 
     editorState.notifyTreeChanged();
 
-    // Default tool = Move (like Godot)
+    // Tool setup
     editorState.setGizmoMode('move');
     setActiveTool('tool-move');
 
-    // --- Tool buttons ---
     const toolMap: Record<string, GizmoMode> = {
         'tool-select': 'select',
         'tool-move': 'move',
@@ -237,49 +223,28 @@ function _process(delta) {
         const id = editorState.selectedEntityId;
         const entity = id ? sm.entities.get(id) : null;
         const isMesh = entity && (entity.type === 'Mesh');
-
         colBtn.style.opacity = isMesh ? '1' : '0.4';
         colBtn.style.pointerEvents = isMesh ? 'auto' : 'none';
-
         if (isMesh) {
-            if (entity.hasCollider) {
-                colBtn.innerText = 'Remove mesh collider';
-                colBtn.classList.add('active');
-            } else {
-                colBtn.innerText = 'Add Mesh Collider';
-                colBtn.classList.remove('active');
-            }
-        } else {
-            colBtn.innerText = 'Add Mesh Collider';
-            colBtn.classList.remove('active');
+            colBtn.innerText = entity.hasCollider ? 'Remove mesh collider' : 'Add Mesh Collider';
+            colBtn.classList.toggle('active', !!entity.hasCollider);
         }
     }
 
-    updateCollisionBtnState(); // Initialize on load
+    updateCollisionBtnState();
 
-    // Keyboard shortcuts: Q/W/E/R (Godot / Blender style)
     window.addEventListener('keydown', (e) => {
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-        // F = Focus selected object (like Unity/Godot)
         if (e.key.toLowerCase() === 'f') {
             const selectedId = editorState.selectedEntityId;
             if (selectedId) engine.focusOnEntity(selectedId);
             return;
         }
-
-        const map: Record<string, string> = {
-            q: 'tool-select',
-            w: 'tool-move',
-            e: 'tool-rotate',
-            r: 'tool-scale',
-            c: 'tool-collision'
-        };
+        const map: Record<string, string> = { q: 'tool-select', w: 'tool-move', e: 'tool-rotate', r: 'tool-scale', c: 'tool-collision' };
         const btnId = map[e.key.toLowerCase()];
         if (btnId) {
-            if (btnId === 'tool-collision') {
-                colBtn?.click();
-            } else {
+            if (btnId === 'tool-collision') colBtn?.click();
+            else {
                 editorState.setGizmoMode(toolMap[btnId]);
                 setActiveTool(btnId);
             }
@@ -291,73 +256,26 @@ function _process(delta) {
         document.getElementById(id)?.classList.add('active');
     }
 
-    // Selection change
-    editorState.onSelectionChanged.push(() => {
-        updateCollisionBtnState();
-    });
-
-    // Debug layer toggle
+    editorState.onSelectionChanged.push(() => updateCollisionBtnState());
     document.getElementById('btn-debug-layer')?.addEventListener('click', () => engine.toggleDebugLayer());
 
-    // View menu toggles
-    const toggleGizmos = document.getElementById('toggle-view-gizmos') as HTMLInputElement;
-    const toggleGizmosCam = document.getElementById('toggle-gizmos-cam') as HTMLInputElement;
-    const toggleGizmosLight = document.getElementById('toggle-gizmos-light') as HTMLInputElement;
-    const toggleColliders = document.getElementById('toggle-view-colliders') as HTMLInputElement;
-
-    toggleGizmos?.addEventListener('change', () => {
-        editorState.setShowGizmos(toggleGizmos.checked);
-        if (toggleGizmosCam) toggleGizmosCam.disabled = !toggleGizmos.checked;
-        if (toggleGizmosLight) toggleGizmosLight.disabled = !toggleGizmos.checked;
+    // --- Controls ---
+    const playBtn = document.querySelector('.play-btn') as HTMLElement;
+    playBtn?.addEventListener('click', async () => {
+        await saveScene(engine);
+        window.open('game.html', '_blank', 'width=1280,height=720');
+        playBtn.classList.add('active');
+        setTimeout(() => playBtn.classList.remove('active'), 1000);
     });
 
-    toggleGizmosCam?.addEventListener('change', () => {
-        editorState.setShowGizmos(toggleGizmosCam.checked, 'cam');
+    const exportBtn = document.getElementById('btn-export-scene');
+    exportBtn?.addEventListener('click', async () => {
+        exportBtn.classList.add('active');
+        await Exporter.exportStandalone(engine);
+        setTimeout(() => exportBtn.classList.remove('active'), 1000);
     });
 
-    toggleGizmosLight?.addEventListener('change', () => {
-        editorState.setShowGizmos(toggleGizmosLight.checked, 'light');
-    });
-
-    toggleColliders?.addEventListener('change', () => {
-        editorState.setShowColliders(toggleColliders.checked);
-    });
-
-    // Sync initial collider state (off by default)
-    editorState.setShowColliders(false);
-
-    // Viewport settings panel sliders
-    const zoomSlider = document.getElementById('zoom-speed-slider') as HTMLInputElement;
-    const panSlider = document.getElementById('pan-speed-slider') as HTMLInputElement;
-    const zoomVal = document.getElementById('zoom-speed-val');
-    const panVal = document.getElementById('pan-speed-val');
-
-    zoomSlider?.addEventListener('input', () => {
-        const v = parseFloat(zoomSlider.value);
-        engine._zoomSensitivity = v;
-        if (zoomVal) zoomVal.textContent = `${v.toFixed(1)}×`;
-    });
-
-    panSlider?.addEventListener('input', () => {
-        const v = parseFloat(panSlider.value);
-        engine._panSensitivity = v;
-        if (panVal) panVal.textContent = `${v.toFixed(1)}×`;
-    });
-
-    document.getElementById('btn-reset-nav')?.addEventListener('click', () => {
-        engine._zoomSensitivity = 1.0;
-        engine._panSensitivity = 1.0;
-        if (zoomSlider) zoomSlider.value = '1';
-        if (panSlider) panSlider.value = '1';
-        if (zoomVal) zoomVal.textContent = '1.0×';
-        if (panVal) panVal.textContent = '1.0×';
-    });
-
-    editorState.onViewSettingsChanged.push(() => {
-        engine.refreshViewSettings();
-    });
-
-    // --- Add Node dialog ---
+    // Add Node dialog
     const dialog = document.getElementById('add-node-dialog')!;
     const nodeItems = dialog.querySelectorAll<HTMLElement>('.node-item');
     let selectedItem: HTMLElement | null = nodeItems[0];
@@ -375,32 +293,9 @@ function _process(delta) {
     const openDialog = () => {
         dialog.classList.remove('hidden');
         (dialog.querySelector('.search-node-input') as HTMLInputElement)?.focus();
-        // Icons in hidden dialogs don't render during page load, so re-run Lucide here
         createIcons({ icons: { Box, Circle, Cylinder, CircleDashed, Pill, Triangle, Disc, Sun, Lightbulb, Flashlight, Globe, Camera, Crosshair, X } });
     };
     const closeDialog = () => dialog.classList.add('hidden');
-
-    // --- Play / Stop Controls ---
-    const playBtn = document.querySelector('.play-btn') as HTMLElement;
-    const stopBtn = document.querySelector('.top-controls .icon-btn[title="Stop"]') as HTMLElement;
-
-    playBtn?.addEventListener('click', async () => {
-        // Save current state first so game window can load it
-        await saveScene(engine);
-
-        // Open game in new window
-        window.open('game.html', '_blank', 'width=1280,height=720');
-
-        // For visual feedback in editor
-        playBtn.classList.add('active');
-        setTimeout(() => playBtn.classList.remove('active'), 1000);
-    });
-
-    stopBtn?.addEventListener('click', () => {
-        engine.stopGame();
-        playBtn.classList.remove('active');
-        playBtn.innerText = '▶';
-    });
 
     document.getElementById('btn-add-node')?.addEventListener('click', openDialog);
     document.getElementById('btn-close-dialog')?.addEventListener('click', closeDialog);
@@ -414,130 +309,82 @@ function _process(delta) {
         const type = selectedItem.dataset.type as any;
         const meshType = selectedItem.dataset.mesh;
         const lightType = selectedItem.dataset.light;
-
         const baseName = meshType || lightType || type;
         nodeCount[baseName] = (nodeCount[baseName] ?? 0) + 1;
-        const count = nodeCount[baseName];
-        const name = count === 1 ? baseName : `${baseName}${count}`;
-
-        const parentEntity = editorState.selectedEntityId
-            ? sm.entities.get(editorState.selectedEntityId)
-            : undefined;
-
+        const name = nodeCount[baseName] === 1 ? baseName : `${baseName}${nodeCount[baseName]}`;
+        const parentEntity = editorState.selectedEntityId ? sm.entities.get(editorState.selectedEntityId) : undefined;
         const entity = sm.createEntity(name, parentEntity);
         entity.type = type;
         if (meshType) entity.meshType = meshType as any;
         if (lightType) entity.lightType = lightType as any;
-
         engine.syncEntity(entity);
         editorState.notifyTreeChanged();
         editorState.selectEntity(entity.id);
         closeDialog();
     }
 
-    // --- Panel Resizing Logic ---
+    // Resizers
     const setupResizer = (resizerId: string, sidebarId: string, isLeft: boolean) => {
         const resizer = document.getElementById(resizerId);
         const sidebar = document.getElementById(sidebarId);
         if (!resizer || !sidebar) return;
-
-        let startX: number;
-        let startWidth: number;
-
+        let startX: number, startWidth: number;
         const onMouseMove = (e: MouseEvent) => {
-            const dx = e.clientX - startX;
-            let newWidth = isLeft ? (startWidth + dx) : (startWidth - dx);
-
-            // Constrain width
-            newWidth = Math.max(200, Math.min(600, newWidth));
-            sidebar.style.width = `${newWidth}px`;
-
-            // Re-sync engine sizes (if needed, Babylon usually handles this on next frame if canvas is % based)
+            let nw = isLeft ? (startWidth + (e.clientX - startX)) : (startWidth - (e.clientX - startX));
+            sidebar.style.width = `${Math.max(200, Math.min(600, nw))}px`;
             engine.babylonEngine.resize();
         };
-
         const onMouseUp = () => {
             resizer.classList.remove('active');
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
             document.querySelectorAll('.resizer-overlay').forEach(el => el.remove());
         };
-
         resizer.addEventListener('mousedown', (e) => {
-            startX = e.clientX;
-            startWidth = sidebar.getBoundingClientRect().width;
+            startX = e.clientX; startWidth = sidebar.getBoundingClientRect().width;
             resizer.classList.add('active');
-
-            // Add a glass overlay to capture mouse events even if mouse goes over iframe/canvas
-            const overlay = document.createElement('div');
-            overlay.className = 'resizer-overlay';
+            const overlay = document.createElement('div'); overlay.className = 'resizer-overlay';
             document.body.appendChild(overlay);
-
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-        });
-    };
-
-    setupResizer('resizer-left', 'left-sidebar', true);
-    setupResizer('resizer-right', 'right-sidebar', false);
-
-    const setupVerticalResizer = (resizerId: string, topId: string, bottomId: string) => {
-        const resizer = document.getElementById(resizerId);
-        const top = document.getElementById(topId);
-        const bottom = document.getElementById(bottomId);
-        if (!resizer || !top || !bottom) return;
-
-        let startY: number;
-        let startTopHeight: number;
-        let startBottomHeight: number;
-
-        const onMouseMove = (e: MouseEvent) => {
-            const dy = e.clientY - startY;
-            const newTopHeight = startTopHeight + dy;
-            const newBottomHeight = startBottomHeight - dy;
-
-            if (newTopHeight > 100 && newBottomHeight > 100) {
-                top.style.flex = 'none';
-                bottom.style.flex = 'none';
-                top.style.height = `${newTopHeight}px`;
-                bottom.style.height = `${newBottomHeight}px`;
-            }
-        };
-
-        const onMouseUp = () => {
-            resizer.classList.remove('active');
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
-            document.querySelectorAll('.resizer-overlay').forEach(el => el.remove());
-        };
-
-        resizer.addEventListener('mousedown', (e) => {
-            startY = e.clientY;
-            startTopHeight = top.getBoundingClientRect().height;
-            startBottomHeight = bottom.getBoundingClientRect().height;
-            resizer.classList.add('active');
-
-            const overlay = document.createElement('div');
-            overlay.className = 'resizer-overlay';
-            overlay.style.cursor = 'row-resize';
-            document.body.appendChild(overlay);
-
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', onMouseUp);
         });
     };
+    setupResizer('resizer-left', 'left-sidebar', true);
+    setupResizer('resizer-right', 'right-sidebar', false);
 
+    const setupVerticalResizer = (resizerId: string, topId: string, bottomId: string) => {
+        const resizer = document.getElementById(resizerId), top = document.getElementById(topId), bottom = document.getElementById(bottomId);
+        if (!resizer || !top || !bottom) return;
+        let startY: number, startTopHeight: number, startBottomHeight: number;
+        const onMouseMove = (e: MouseEvent) => {
+            const dy = e.clientY - startY;
+            if (startTopHeight + dy > 100 && startBottomHeight - dy > 100) {
+                top.style.flex = 'none'; bottom.style.flex = 'none';
+                top.style.height = `${startTopHeight + dy}px`; bottom.style.height = `${startBottomHeight - dy}px`;
+            }
+        };
+        const onMouseUp = () => {
+            resizer.classList.remove('active');
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            document.querySelectorAll('.resizer-overlay').forEach(el => el.remove());
+        };
+        resizer.addEventListener('mousedown', (e) => {
+            startY = e.clientY; startTopHeight = top.getBoundingClientRect().height; startBottomHeight = bottom.getBoundingClientRect().height;
+            resizer.classList.add('active');
+            const overlay = document.createElement('div'); overlay.className = 'resizer-overlay'; overlay.style.cursor = 'row-resize';
+            document.body.appendChild(overlay);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+    };
     setupVerticalResizer('resizer-left-v', 'scene-panel', 'filesystem-panel');
 
-    // Initialize all HTML-embedded Lucide icons
     createIcons({
-        icons: { Play, Pause, Square, Plus, Link, Search, FolderPlus, FilePlus, Upload, ChevronLeft, ChevronRight, Settings, X, Gamepad2, Boxes, Box, Circle, Cylinder, CircleDashed, Pill, Triangle, Disc, Sun, Lightbulb, Flashlight, Globe, Camera, Crosshair }
+        icons: { Play, Download, Plus, Link, Search, FolderPlus, FilePlus, Upload, ChevronLeft, ChevronRight, Settings, X, Gamepad2, Boxes, Box, Circle, Cylinder, CircleDashed, Pill, Triangle, Disc, Sun, Lightbulb, Flashlight, Globe, Camera, Crosshair }
     });
 
-    // --- Final Security: Save on refresh/close ---
-    window.addEventListener('beforeunload', () => {
-        saveScene(engine);
-    });
+    window.addEventListener('beforeunload', () => saveScene(engine));
 };
 
 window.addEventListener('DOMContentLoaded', initEditor);
