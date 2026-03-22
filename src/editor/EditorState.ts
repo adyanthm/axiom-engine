@@ -8,7 +8,7 @@ class EditorState {
     public showGizmos: boolean = true;
     public showCameraGizmos: boolean = true;
     public showLightGizmos: boolean = true;
-    public showColliders: boolean = true;
+    public showColliders: boolean = false;
     
     public onSelectionChanged: ((id: string | null) => void)[] = [];
     public onTreeChanged: (() => void)[] = [];

@@ -68,6 +68,7 @@ export class CoreEngine {
         editorState.onGizmoModeChanged.push((mode) => this.applyGizmoMode(mode));
         editorState.onSelectionChanged.push((id) => this._handleSelectionVisuals(id));
         editorState.onTransformChanged.push(() => this.refreshAllColliderVisuals());
+        editorState.onViewSettingsChanged.push(() => this.refreshViewSettings());
 
         this.babylonEngine.runRenderLoop(() => {
             if (this.isPlaying) {
@@ -107,10 +108,10 @@ export class CoreEngine {
                 // 2. Dynamically shift the near-clip plane to prevent depth-buffer Z-fighting artifacts
                 camera.minZ = Math.max(0.1, camera.maxZ / 100000);
 
-                // 3. Scale scroll (zoom) speed relative to distance from subject
-                camera.wheelPrecision = Math.max(0.01, 500 / Math.max(1, camera.radius)) * (this._zoomSensitivity ?? 1);
+                // 3. Scale scroll (zoom) speed relative to distance from subject (DIVIDE by sensitivity so 5x = 5x faster)
+                camera.wheelPrecision = Math.max(0.01, 500 / Math.max(1, camera.radius)) / (this._zoomSensitivity ?? 1);
 
-                // 4. Scale panning speed relative to distance from subject (high sensibility = slow pan)
+                // 4. Scale panning speed relative to distance from subject (DIVIDE by sensitivity = faster pan)
                 camera.panningSensibility = Math.max(1, 1200 / Math.max(1, camera.radius)) / (this._panSensitivity ?? 1);
             }
         });
@@ -365,40 +366,21 @@ export class CoreEngine {
     public toggleDebugLayer() {
         if (this.debugLayerVisible) {
             this.babylonScene.debugLayer.hide();
-            if (this.debugPopup && !this.debugPopup.closed) {
-                this.debugPopup.close();
-            }
-            this.debugPopup = null;
-            
             // Hide physics debug
-            for (const mesh of this.babylonScene.meshes) {
-                if (mesh.parent instanceof BabylonNode && (mesh.parent as any).physicsBody) {
-                    this.physicsViewer?.hideBody((mesh.parent as any).physicsBody);
-                }
+            for (const body of this.babylonScene.physicsEnabled ? this.babylonScene.getPhysicsEngine()?.getPluginData()?.bodies || [] : []) {
+                this.physicsViewer?.hideBody(body);
             }
         } else {
-            this.debugPopup = window.open('', '_blank', 'width=1000,height=800');
-            if (this.debugPopup) {
-                this.debugPopup.document.write('<!DOCTYPE html><html><head><title>Axiom Inspector</title></head><body style="margin:0; padding:0; overflow:hidden;"></body></html>');
-                this.debugPopup.document.close();
-                
-                this.babylonScene.debugLayer.show({ 
-                    embedMode: true,
-                    globalRoot: this.debugPopup.document.body,
-                    handleResize: true
-                });
+            // Use standard embedded inspector (most reliable for styling and browser security)
+            this.babylonScene.debugLayer.show({
+                showInspector: true,
+                embedMode: false, // Set to true to embed in a specific div, but false + NO globalRoot uses the canvas overlay
+                overlay: true
+            });
 
-                this.debugPopup.addEventListener('beforeunload', () => {
-                    this.babylonScene.debugLayer.hide();
-                    this.debugLayerVisible = false;
-                    this.debugPopup = null;
-                });
-            } else {
-                // Fallback to embedded if popups are blocked by the browser
-                this.babylonScene.debugLayer.show({ embedMode: true });
-            }
-            // Show physics debug
-            for (const mesh of this.babylonScene.meshes) {
+            // Show physics debug if enabled
+            const meshes = this.babylonScene.meshes;
+            for (const mesh of meshes) {
                 if ((mesh as any).physicsBody) {
                     this.physicsViewer?.showBody((mesh as any).physicsBody);
                 }

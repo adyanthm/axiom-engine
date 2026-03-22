@@ -384,6 +384,47 @@ function _process(delta) {
         icons: { Play, Download, Plus, Link, Search, FolderPlus, FilePlus, Upload, ChevronLeft, ChevronRight, Settings, X, Gamepad2, Boxes, Box, Circle, Cylinder, CircleDashed, Pill, Triangle, Disc, Sun, Lightbulb, Flashlight, Globe, Camera, Crosshair }
     });
 
+    // --- View Menu & Viewport Settings ---
+    const setupViewControls = () => {
+        const gizmoToggle = document.getElementById('toggle-view-gizmos') as HTMLInputElement;
+        const camGizmoToggle = document.getElementById('toggle-gizmos-cam') as HTMLInputElement;
+        const lightGizmoToggle = document.getElementById('toggle-gizmos-light') as HTMLInputElement;
+        const colliderToggle = document.getElementById('toggle-view-colliders') as HTMLInputElement;
+
+        gizmoToggle?.addEventListener('change', () => editorState.setShowGizmos(gizmoToggle.checked));
+        camGizmoToggle?.addEventListener('change', () => editorState.setShowGizmos(camGizmoToggle.checked, 'cam'));
+        lightGizmoToggle?.addEventListener('change', () => editorState.setShowGizmos(lightGizmoToggle.checked, 'light'));
+        colliderToggle?.addEventListener('change', () => editorState.setShowColliders(colliderToggle.checked));
+
+        const zoomSlider = document.getElementById('zoom-speed-slider') as HTMLInputElement;
+        const panSlider = document.getElementById('pan-speed-slider') as HTMLInputElement;
+        const zoomVal = document.getElementById('zoom-speed-val');
+        const panVal = document.getElementById('pan-speed-val');
+
+        zoomSlider?.addEventListener('input', () => {
+            const val = parseFloat(zoomSlider.value);
+            engine._zoomSensitivity = val;
+            if (zoomVal) zoomVal.innerText = `${val.toFixed(1)}x`;
+        });
+
+        panSlider?.addEventListener('input', () => {
+            const val = parseFloat(panSlider.value);
+            engine._panSensitivity = val;
+            if (panVal) panVal.innerText = `${val.toFixed(1)}x`;
+        });
+
+        document.getElementById('btn-reset-nav')?.addEventListener('click', () => {
+            if (zoomSlider) { zoomSlider.value = '1'; zoomSlider.dispatchEvent(new Event('input')); }
+            if (panSlider) { panSlider.value = '1'; panSlider.dispatchEvent(new Event('input')); }
+        });
+
+        // Initialize UI from state
+        if (gizmoToggle) gizmoToggle.checked = editorState.showGizmos;
+        if (colliderToggle) colliderToggle.checked = editorState.showColliders;
+    };
+
+    setupViewControls();
+
     window.addEventListener('beforeunload', () => saveScene(engine));
 };
 
