@@ -1035,37 +1035,66 @@ button {
 }
 
 /* =====================
-   CONTEXT MENU
+   CONTEXT MENU (Premium Design)
    ===================== */
 .context-menu {
   position: fixed;
-  z-index: 9999;
-  background: #2d2d2d;
-  border: 1px solid #444;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-  border-radius: 4px;
-  padding: 4px 0;
-  min-width: 160px;
+  z-index: 10000;
+  background-color: rgba(26, 30, 40, 0.95); /* Material dark */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 6px;
+  min-width: 180px;
+  animation: contextFadeIn 0.1s ease-out;
+}
+
+@keyframes contextFadeIn {
+  from { opacity: 0; transform: scale(0.95) translateY(-5px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .menu-item-action {
-  padding: 8px 16px;
-  color: #ddd;
+  padding: 8px 12px;
+  color: var(--g-text);
   font-size: 13px;
   cursor: pointer;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.1s;
+  user-select: none;
 }
+
 .menu-item-action:hover {
-  background: #4b8eb8;
-  color: white;
+  background-color: var(--g-accent);
+  color: #fff;
 }
+
+.menu-item-action.danger:hover {
+  background-color: #e55353;
+  color: #fff;
+}
+
+.menu-item-action i {
+  width: 14px;
+  height: 14px;
+  opacity: 0.8;
+}
+
 .menu-item-action.divider {
   height: 1px;
-  background: #444;
-  margin: 4px 0;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 6px 4px;
   padding: 0;
 }
+
 .menu-item-action.disabled {
-  color: #666;
+  color: var(--g-text-dim);
+  opacity: 0.5;
   pointer-events: none;
 }
 

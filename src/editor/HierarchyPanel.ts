@@ -1,7 +1,7 @@
 import { SceneManager } from '../engine/SceneManager';
 import { Entity } from '../engine/Entity';
 import { editorState } from './EditorState';
-import { createIcons, Camera, Lightbulb, Box, Globe, ChevronDown, ChevronRight, Eye, EyeOff, Crosshair, Filter, MoreHorizontal, ArrowDownAZ, Boxes } from 'lucide';
+import { createIcons, Camera, Lightbulb, Box, Globe, ChevronDown, ChevronRight, Eye, EyeOff, Crosshair, Filter, MoreHorizontal, ArrowDownAZ, Boxes, Trash2, FileCode, ShieldPlus, ShieldAlert, Zap } from 'lucide';
 
 export class HierarchyPanel {
     private container: HTMLElement;
@@ -106,7 +106,7 @@ export class HierarchyPanel {
         // Initialize lucide icons for everything we just added
         createIcons({
             icons: {
-                Camera, Lightbulb, Box, Globe, ChevronDown, ChevronRight, Eye, EyeOff, Crosshair, Filter, MoreHorizontal, ArrowDownAZ, Boxes
+                Camera, Lightbulb, Box, Globe, ChevronDown, ChevronRight, Eye, EyeOff, Crosshair, Filter, MoreHorizontal, ArrowDownAZ, Boxes, Trash2, FileCode, ShieldPlus, ShieldAlert, Zap
             }
         });
     }
@@ -300,6 +300,7 @@ export class HierarchyPanel {
         const items = [
             {
                 label: hasScript ? 'Edit Script' : 'Attach Script',
+                icon: 'file-code',
                 action: () => {
                     if (!hasScript) {
                         entity.script = `// ${entity.name}.js\n\nfunction _ready() {\n    // Called when node enters scene\n}\n\nfunction _process(delta) {\n    // Called every frame\n}\n`;
@@ -307,23 +308,18 @@ export class HierarchyPanel {
                     editorState.setViewMode('script');
                 }
             },
-            {
-                label: 'Delete', action: () => {
-                    this.sceneManager.removeEntity(entity.id);
-                    editorState.clearSelection();
-                    editorState.notifyTreeChanged();
-                }
-            },
             { label: 'divider', action: () => { }, divider: true }
         ];
 
+        // Physics Logic
         if (entity.type === 'Mesh' && entity.meshType === 'ImportedModel') {
             if (!entity.hasCollider) {
                 items.push({
                     label: 'Add Mesh Collider',
+                    icon: 'shield-plus',
                     action: () => {
                         entity.hasCollider = true;
-                        entity.collidable = true; // Auto-enable on add
+                        entity.collidable = true;
                         editorState.notifyTreeChanged();
                         editorState.notifyTransformChanged();
                     }
@@ -331,6 +327,7 @@ export class HierarchyPanel {
             } else {
                 items.push({
                     label: 'Remove Mesh Collider',
+                    icon: 'shield-alert',
                     action: () => {
                         entity.hasCollider = false;
                         entity.collidable = false;
@@ -341,6 +338,19 @@ export class HierarchyPanel {
             }
         }
 
+        items.push({ label: 'divider', action: () => { }, divider: true });
+        
+        items.push({
+            label: 'Delete Entity',
+            icon: 'trash-2',
+            danger: true,
+            action: () => {
+                this.sceneManager.removeEntity(entity.id);
+                editorState.clearSelection();
+                editorState.notifyTreeChanged();
+            }
+        });
+
         items.forEach((item: any) => {
             if (item.divider) {
                 const div = document.createElement('div');
@@ -349,8 +359,13 @@ export class HierarchyPanel {
                 return;
             }
             const el = document.createElement('div');
+            el.className = `menu-item-action ${item.danger ? 'danger' : ''}`;
 
-            el.innerText = item.label;
+            el.innerHTML = `
+                <i data-lucide="${item.icon}" style="width:14px; height:14px;"></i>
+                <span>${item.label}</span>
+            `;
+            
             el.onclick = () => {
                 if (!item.disabled) {
                     item.action();
@@ -361,6 +376,10 @@ export class HierarchyPanel {
         });
 
         document.body.appendChild(menu);
+        
+        createIcons({
+            icons: { Trash2, FileCode, ShieldPlus, ShieldAlert, Zap }
+        });
 
         const closeMenu = () => {
             menu.remove();
