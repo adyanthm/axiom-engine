@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/AxiomEngine/branding/main/hero.png" alt="Axiom Game Engine Hero" width="800">
+  <img src="./media/demo.gif" alt="Axiom Game Engine Hero" width="800">
   <p align="center">
     <strong>Axiom Game Engine — High-performance, web-native 3D. Built on Babylon.js and Havok.</strong>
   </p>
@@ -27,11 +27,11 @@ Axiom is a industrial-grade, browser-based game engine. Built from the ground up
 
 | Feature | Description | Showcase |
 | :--- | :--- | :--- |
-| **Havok Battle-Tested Physics** | Native Havok UMD integration. Massive-scale collision detection, industrial stability, and real-time collider debugging. | ![Havok](https://raw.githubusercontent.com/AxiomEngine/branding/main/havok_slay.gif) |
-| **One-Click Mesh Collider** | Instantly generate a precise MESH collider for massive 3D models with hundreds of children. No more 'Ghost Walls'. | ![Collider](https://raw.githubusercontent.com/AxiomEngine/branding/main/collider_slay.gif) |
-| **Smooth Camera Follow** | Professional third-person camera system with one-click targeting and smooth interpolation. | ![Camera](https://raw.githubusercontent.com/AxiomEngine/branding/main/camera_slay.gif) |
-| **High-Fidelity Rendering** | Cinematic ACES tone-mapping, dynamic exponential shadows, and native PBR support for GLTF/GLB models. | ![Rendering](https://raw.githubusercontent.com/AxiomEngine/branding/main/render_slay.gif) |
-| **Zero-Blob Export** | Signature standalone export. Generates a single-file portable HTML with the engine and assets baked-in. | ![Export](https://raw.githubusercontent.com/AxiomEngine/branding/main/export_slay.gif) |
+| **Havok Battle-Tested Physics** | Native Havok UMD integration. Massive-scale collision detection, industrial stability, and real-time collider debugging. | ![Havok](./media/physics.gif) |
+| **One-Click Mesh Collider** | Instantly generate a precise MESH collider for massive 3D models with hundreds of children. No more 'Ghost Walls'. | ![Collider](./media/mesh.gif) |
+| **Smooth Camera Follow** | Professional third-person camera system with one-click targeting and smooth interpolation. | ![Camera](./media/camera.gif) |
+| **High-Fidelity Rendering** | Cinematic ACES tone-mapping, dynamic exponential shadows, and native PBR support for GLTF/GLB models. | ![Rendering](./media/demo.gif) |
+| **Zero-Blob Export** | Signature standalone export. Generates a single-file portable HTML with the engine and assets baked-in. | ![Export](./media/save.gif) |
 
 ---
 
