@@ -297,7 +297,17 @@ export class HierarchyPanel {
         menu.style.top = `${y}px`;
 
         const hasScript = entity.script && entity.script.trim() !== '';
-        const items = [
+
+        interface MenuItem {
+            label?: string;
+            icon?: string;
+            action: () => void;
+            divider?: boolean;
+            danger?: boolean;
+            disabled?: boolean;
+        }
+
+        const items: MenuItem[] = [
             {
                 label: hasScript ? 'Edit Script' : 'Attach Script',
                 icon: 'file-code',
@@ -308,7 +318,7 @@ export class HierarchyPanel {
                     editorState.setViewMode('script');
                 }
             },
-            { label: 'divider', action: () => { }, divider: true }
+            { divider: true, action: () => { } }
         ];
 
         // Physics Logic

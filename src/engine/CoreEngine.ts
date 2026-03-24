@@ -33,7 +33,6 @@ export class CoreEngine {
     private gizmoManager!: GizmoManager;
     private editorGizmos!: EditorGizmos;
     private debugLayerVisible = false;
-    private debugPopup: Window | null = null;
     private physicsViewer: PhysicsViewer | null = null;
     private static _havokInstance: any = null;
     /** Per-entity shadow generators (DirectionalLight only) */
@@ -367,8 +366,11 @@ export class CoreEngine {
         if (this.debugLayerVisible) {
             this.babylonScene.debugLayer.hide();
             // Hide physics debug
-            for (const body of this.babylonScene.physicsEnabled ? this.babylonScene.getPhysicsEngine()?.getPluginData()?.bodies || [] : []) {
-                this.physicsViewer?.hideBody(body);
+            const meshes = this.babylonScene.meshes;
+            for (const mesh of meshes) {
+                if ((mesh as any).physicsBody) {
+                    this.physicsViewer?.hideBody((mesh as any).physicsBody);
+                }
             }
         } else {
             // Use standard embedded inspector (most reliable for styling and browser security)
