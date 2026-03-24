@@ -41,7 +41,7 @@ Experience the speed of development with Vite-driven hot-reloading.
 
 ```bash
 # Clone the repository
-git clone https://github.com/YourUser/AxiomEngine.git
+git clone https://github.com/adyanthm/axiom-engine.git
 
 # Install dependencies
 npm install
@@ -107,4 +107,4 @@ We follow a high-end engineering standard. If you want to contribute, please rea
 
 ## 📜 License
 
-Axiom Engine is released under the MIT License. Built with ❤️ by the Axiom Team.
+Axiom Engine is released under the MIT License. Built with ❤️ by Adyanth M.
