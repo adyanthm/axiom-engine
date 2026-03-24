@@ -1,5 +1,9 @@
 <div align="center">
   <img src="./media/demo.gif" alt="Axiom Game Engine Hero" width="800">
+
+  > [!WARNING]  
+  > **Axiom Game Engine is currently in Heavy Beta.** We are actively developing core features and stability. Expect breaking changes as we move toward a 1.0 release.
+
   <p align="center">
     <strong>Axiom Game Engine — High-performance, web-native 3D. Built on Babylon.js and Havok.</strong>
   </p>
@@ -92,6 +96,18 @@ graph TD
 *   **Engine Core**: Uses Babylon.js for rendering and Havok for physics.
 *   **Editor Layer**: A high-performance Vanilla CSS & TS shell with a Godot-style workspace.
 *   **Persistence**: Uses IndexedDB for local asset management and JSON for scene serialization.
+
+---
+
+## 🗺️ Roadmap (Development TODO)
+
+Axiom is evolving. Here is what we are currently engineering for the next major milestone:
+
+*   **🎬 Animation Frame Editor**: Built-in timeline and keyframe editor for skinned-mesh animations.
+*   **📐 Collision Shapes**: Support for advanced primitive and compound collision shapes (Box, Sphere, Capsule, Compound).
+*   **🔊 Sound Effects**: Advanced 3D spatial audio bridge for environmental sounds and music.
+*   **⚙️ Advanced Scripting**: Enhanced TypeScript definition support and a more powerful bridge API.
+*   **🖼️ HUD Panels**: Dedicated 2D UI layout system for in-game health bars, menus, and overlays.
 
 ---
 

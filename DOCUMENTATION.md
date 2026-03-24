@@ -1,4 +1,7 @@
-# Axiom Engine Technical Manual
+# Axiom Game Engine Manual
+
+> [!CAUTION]  
+> **HEAVY BETA**: This technical manual is subject to change as the engine evolves.
 
 Axiom is a high-performance 3D engine for the web. This document covers its internal architecture, the Godot-style scene tree, Havok physics, and the scripting API.
 
